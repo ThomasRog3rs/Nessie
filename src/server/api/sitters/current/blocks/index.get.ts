@@ -1,4 +1,5 @@
-export default defineApiHandler(async (): Promise<AvailabilityBlock[]> => {
-  const { availabilityBlocks, actors } = await useServices()
-  return availabilityBlocks.list(actors.sitterId())
+export default defineApiHandler(async (event): Promise<AvailabilityBlock[]> => {
+  const sitterId = await requireSitterId(event)
+  const { availabilityBlocks } = await useServices()
+  return availabilityBlocks.list(sitterId)
 })

@@ -1,6 +1,6 @@
 # Nesse application
 
-Nuxt 4 + Vue 3 + TypeScript + Tailwind + Pinia, backed by SQLite (Node's built-in `node:sqlite`). The Nuxt project root is this directory. Auth is not implemented yet: a mock actor provider resolves the booker (`booker-demo`) and the sitter (**Thomas Rogers**, `sitter-thomas-rogers`).
+Nuxt 4 + Vue 3 + TypeScript + Tailwind + Pinia, backed by SQLite (Node's built-in `node:sqlite`). The Nuxt project root is this directory. Auth uses Clerk (`@clerk/nuxt`; keys in `.env` as `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `NUXT_CLERK_SECRET_KEY`). Only one sitter can ever sign up (`/sitter/signup`); bookers join only via single-use, expiring invite links created by the sitter at `/sitter/bookers`. Set Clerk to restricted mode in the dashboard to block other sign-ups.
 
 ## Requirements
 
@@ -36,7 +36,7 @@ Conventions: dates `yyyy-mm-dd`, times `HH:mm`, instants ISO UTC, money in integ
 
 - Booker pages use `/book` and `/bookings/*`.
 - Sitter pages use the separate `/sitter/*` route group and the `sitter` layout: overview, requests, bookings, availability, and profile.
-- Sitter pages use the typed `/api/sitters/current/*` endpoints for persistent profiles, requests, bookings, availability, progress updates, expenses and photos. The current actor remains the development mock sitter; authentication is not implemented.
+- Sitter pages use the typed `/api/sitters/current/*` endpoints for persistent profiles, requests, bookings, availability, progress updates, expenses and photos. Requests are authorised by the signed-in Clerk user's sitter or booker role.
 - Property access instructions, emergency instructions and contact/veterinary details are omitted from sitter booking responses until the booking is confirmed or completed. Requested handover times remain separate from the agreed times.
 - Booking photos and receipts are stored outside SQLite in a private local directory. They are available only through an ownership-checked booking attachment route; their filesystem paths are never returned. The local filesystem adapter is intended for development or a single-node deployment with a persistent private volume.
 - Attachments are limited to one upload per request and 10 MiB per file. Receipts allow PDF/JPG/PNG; photos allow JPG/PNG/WebP. MIME types and file signatures are checked server-side.

@@ -10,6 +10,14 @@ if (!draft.hasDates) await navigateTo('/book')
 
 const { data: sitter } = await useAsyncData('sitter', () => api.getSitter())
 
+const { data: savedDetails } = await useFetch<BookerProfile>('/api/booker/profile', { key: 'booker-profile' })
+const prefilled = ref(false)
+if (savedDetails.value) {
+  const before = JSON.stringify([draft.pets, draft.emergencyContact, draft.vet, draft.propertyInstructions, draft.emergencyInstructions])
+  draft.prefillFromProfile(savedDetails.value)
+  prefilled.value = before !== JSON.stringify([draft.pets, draft.emergencyContact, draft.vet, draft.propertyInstructions, draft.emergencyInstructions])
+}
+
 const speciesItems = computed(() => sitter.value?.acceptedPets ?? [])
 const serviceItems = computed(() =>
   (sitter.value?.optionalServices ?? []).map(s => ({
@@ -43,6 +51,19 @@ function validate(): FormError[] {
     <p class="mt-2 max-w-prose text-muted">
       Tell your sitter what they need to know. Please don't include your home address or door codes yet – those are shared once the booking is confirmed.
     </p>
+
+    <UAlert
+      v-if="prefilled"
+      class="mt-6"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-wand-sparkles"
+      title="Filled in from your saved details"
+    >
+      <template #description>
+        Check everything is right for this booking. You can change your saved details in <NuxtLink to="/account" class="font-semibold underline">My details</NuxtLink>.
+      </template>
+    </UAlert>
 
     <UForm :state="draft" :validate="validate" :validate-on="['blur']" class="mt-8 space-y-10" @submit="navigateTo('/book/review')">
       <section aria-labelledby="pets-h" class="space-y-4">

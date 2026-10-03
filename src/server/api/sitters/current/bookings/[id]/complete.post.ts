@@ -2,7 +2,8 @@ import { bookingIdSchema } from '../../../../../../shared/schemas/booking'
 import type { SitterBooking } from '../../../../../../shared/types/booking.ts'
 
 export default defineApiHandler(async (event): Promise<SitterBooking> => {
+  const sitterId = await requireSitterId(event)
   const id = parseParam(event, 'id', bookingIdSchema)
-  const { sitterBookings, actors } = await useServices()
-  return sitterBookings.complete(actors.sitterId(), id)
+  const { sitterBookings } = await useServices()
+  return sitterBookings.complete(sitterId, id)
 })

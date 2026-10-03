@@ -1,6 +1,6 @@
 import type {
   AvailabilityBlock, AvailabilityBlockInput, Booking, BookingAttachment, BookingHistoryEntry,
-  BookingProgressUpdate, BookingStatus, Sitter, SitterExpense, SitterProfileInput,
+  BookerInvite, BookerProfile, BookerProfileInput, BookingProgressUpdate, BookingStatus, LinkedBooker, Sitter, SitterExpense, SitterProfileInput,
 } from '../../shared/types/booking.ts'
 
 export interface DateSpan {
@@ -17,6 +17,56 @@ export interface SitterRepository {
   /** The sitter a booker has a preferred relationship with. */
   findPreferredForBooker(bookerId: string): Sitter | undefined
   updateProfile(sitterId: string, input: PersistableSitterProfile): void
+}
+
+export interface InviteRecord {
+  id: string
+  sitterId: string
+  sitterName: string
+  expiresAt: string
+  disabledAt?: string
+  usedAt?: string
+}
+
+export interface NewInvite {
+  id: string
+  sitterId: string
+  tokenHash: string
+  label: string
+  createdAt: string
+  expiresAt: string
+}
+
+export interface NewBooker {
+  id: string
+  clerkUserId: string
+  email: string
+  createdAt: string
+  profile: BookerProfileInput
+}
+
+export interface AccountRepository {
+  findSitterIdByClerkUser(clerkUserId: string): string | undefined
+  findBookerIdByClerkUser(clerkUserId: string): string | undefined
+  /** Number of sitters that have been linked to a sign-in account. */
+  countClaimedSitters(): number
+  /** A sitter row that exists but has never been linked to a sign-in account (e.g. demo data). */
+  findUnclaimedSitterId(): string | undefined
+  claimSitter(sitterId: string, clerkUserId: string, email: string): void
+  insertSitter(sitter: { id: string, clerkUserId: string, email: string, createdAt: string }): void
+
+  insertInvite(invite: NewInvite): void
+  findInviteByHash(tokenHash: string): InviteRecord | undefined
+  listInvites(sitterId: string): Array<Omit<BookerInvite, 'status'> & { disabledAt?: string }>
+  disableInvite(sitterId: string, inviteId: string, at: string): boolean
+  /** Atomically spends a still-usable invite; false when it was already used, disabled or expired. */
+  consumeInvite(inviteId: string, bookerId: string, at: string): boolean
+
+  insertBooker(booker: NewBooker): void
+  linkBookerToSitter(bookerId: string, sitterId: string, createdAt: string): void
+  findBookerProfile(bookerId: string): BookerProfile | undefined
+  updateBookerProfile(bookerId: string, profile: BookerProfileInput): void
+  listBookersForSitter(sitterId: string): LinkedBooker[]
 }
 
 export interface AvailabilityBlockRepository {

@@ -1,4 +1,5 @@
-export default defineApiHandler(async (): Promise<Booking[]> => {
-  const { bookings, actors } = await useServices()
-  return bookings.list(actors.bookerId())
+export default defineApiHandler(async (event): Promise<Booking[]> => {
+  const bookerId = await requireBookerId(event)
+  const { bookings } = await useServices()
+  return bookings.list(bookerId)
 })

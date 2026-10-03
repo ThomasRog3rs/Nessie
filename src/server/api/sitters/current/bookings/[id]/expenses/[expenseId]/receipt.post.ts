@@ -6,14 +6,15 @@ import { readUpload } from '../../../../../../../utils/uploads.ts'
 const RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
 export default defineApiHandler(async (event): Promise<BookingAttachment> => {
+  const sitterId = await requireSitterId(event)
   const bookingId = parseParam(event, 'id', bookingIdSchema)
   const expenseId = parseParam(event, 'expenseId', bookingIdSchema)
   const { file } = await readUpload(event, RECEIPT_TYPES)
   const storage = new PrivateFileStorage()
   const storageKey = await storage.put(file.contents)
   try {
-    const { sitterBookings, actors } = await useServices()
-    const attachment = sitterBookings.addAttachment(actors.sitterId(), bookingId, {
+    const { sitterBookings } = await useServices()
+    const attachment = sitterBookings.addAttachment(sitterId, bookingId, {
       id: crypto.randomUUID(),
       bookingId,
       expenseId,
@@ -21,7 +22,7 @@ export default defineApiHandler(async (event): Promise<BookingAttachment> => {
       fileName: file.fileName,
       mimeType: file.mimeType,
       size: file.contents.length,
-      creatorId: actors.sitterId(),
+      creatorId: sitterId,
       createdAt: new Date().toISOString(),
       storageKey,
     })

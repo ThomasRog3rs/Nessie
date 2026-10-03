@@ -8,6 +8,7 @@ import { readMultipartUpload } from '../../../../../../utils/uploads.ts'
 const RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
 export default defineApiHandler(async (event) => {
+  const sitterId = await requireSitterId(event)
   const id = parseParam(event, 'id', bookingIdSchema)
   const { fields, file } = await readMultipartUpload(event, RECEIPT_TYPES)
   const input = parseValue(sitterExpenseSchema, {
@@ -18,7 +19,7 @@ export default defineApiHandler(async (event) => {
   const storage = new PrivateFileStorage()
   const storageKey = file ? await storage.put(file.contents) : undefined
   try {
-    const { sitterBookings, actors } = await useServices()
+    const { sitterBookings } = await useServices()
     const receipt: (BookingAttachment & { storageKey: string }) | undefined = file && storageKey
       ? {
           id: crypto.randomUUID(),
@@ -27,12 +28,12 @@ export default defineApiHandler(async (event) => {
           fileName: file.fileName,
           mimeType: file.mimeType,
           size: file.contents.length,
-          creatorId: actors.sitterId(),
+          creatorId: sitterId,
           createdAt: new Date().toISOString(),
           storageKey,
         }
       : undefined
-    const expense = sitterBookings.addExpense(actors.sitterId(), id, input, receipt)
+    const expense = sitterBookings.addExpense(sitterId, id, input, receipt)
     setResponseStatus(event, 201)
     return expense
   }

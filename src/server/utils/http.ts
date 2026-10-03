@@ -4,6 +4,9 @@ import { DomainError, ValidationError } from '../domain/errors.ts'
 import type { ApiErrorData } from '../../shared/types/booking.ts'
 
 const STATUS_BY_CODE = {
+  unauthorized: 401,
+  forbidden: 403,
+  gone: 410,
   validation_failed: 422,
   not_found: 404,
   conflict: 409,

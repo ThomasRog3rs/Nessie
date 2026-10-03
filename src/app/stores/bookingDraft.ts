@@ -56,6 +56,19 @@ export const useBookingDraftStore = defineStore('bookingDraft', () => {
     }
   }
 
+  /** Fills only blank fields, so anything the booker already typed in this draft is kept. */
+  function prefillFromProfile(profile: BookerProfile) {
+    if (pets.value.every(p => !p.name.trim() && !p.species && !p.notes.trim()) && profile.pets.length > 0) {
+      pets.value = profile.pets.map(p => ({ ...p }))
+    }
+    if (!propertyInstructions.value.trim()) propertyInstructions.value = profile.propertyInstructions
+    if (!emergencyContact.value.name && !emergencyContact.value.phone && !emergencyContact.value.relationship) {
+      emergencyContact.value = { ...profile.emergencyContact }
+    }
+    if (!vet.value.name && !vet.value.phone) vet.value = { ...profile.vet }
+    if (!emergencyInstructions.value.trim()) emergencyInstructions.value = profile.emergencyInstructions
+  }
+
   function $reset() {
     startDate.value = endDate.value = undefined
     arrivalTime.value = '10:00'
@@ -74,6 +87,6 @@ export const useBookingDraftStore = defineStore('bookingDraft', () => {
     startDate, endDate, arrivalTime, departureTime, pets, careNotes, propertyInstructions,
     optionalServiceIds, travelAmount, travelNotes, incidentalExpenses, emergencyContact, vet,
     emergencyInstructions, cancellationTermAcknowledged, nights, hasDates,
-    addPet, removePet, addExpense, removeExpense, toRequest, $reset,
+    addPet, removePet, addExpense, removeExpense, prefillFromProfile, toRequest, $reset,
   }
 })

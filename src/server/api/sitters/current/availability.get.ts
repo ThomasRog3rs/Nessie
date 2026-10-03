@@ -1,8 +1,9 @@
 import { availabilityQuerySchema } from '../../../../shared/schemas/booking'
 
 export default defineApiHandler(async (event): Promise<AvailabilityDay[]> => {
+  const bookerId = await requireBookerId(event)
   const { from, to } = parseQuery(event, availabilityQuerySchema)
-  const { availability, sitters, actors } = await useServices()
-  const sitter = sitters.getPreferredSitter(actors.bookerId())
+  const { availability, sitters } = await useServices()
+  const sitter = sitters.getPreferredSitter(bookerId)
   return availability.getDays(sitter.id, from, to)
 })

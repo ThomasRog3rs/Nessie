@@ -2,6 +2,7 @@
 const items = [
   { label: 'Book', to: '/book', icon: 'i-lucide-calendar-plus' },
   { label: 'My bookings', to: '/bookings', icon: 'i-lucide-calendar-check' },
+  { label: 'My details', to: '/account', icon: 'i-lucide-user-round' },
 ]
 </script>
 
@@ -31,6 +32,7 @@ const items = [
             {{ item.label }}
           </NuxtLink>
         </nav>
+        <ClientOnly><UserButton /></ClientOnly>
       </div>
     </header>
 
@@ -40,7 +42,7 @@ const items = [
 
     <nav
       aria-label="Main"
-      class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t border-default bg-default pb-[env(safe-area-inset-bottom)] sm:hidden"
+      class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-default bg-default pb-[env(safe-area-inset-bottom)] sm:hidden"
     >
       <NuxtLink
         v-for="item in items"

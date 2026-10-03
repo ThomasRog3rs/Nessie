@@ -6,6 +6,7 @@ const items = [
   { label: 'Overview', to: '/sitter', icon: 'i-lucide-layout-dashboard', exact: true },
   { label: 'Requests', to: '/sitter/requests', icon: 'i-lucide-inbox' },
   { label: 'Bookings', to: '/sitter/bookings', icon: 'i-lucide-calendar-check' },
+  { label: 'Bookers', to: '/sitter/bookers', icon: 'i-lucide-users' },
   { label: 'Availability', to: '/sitter/availability', icon: 'i-lucide-calendar-days' },
   { label: 'Profile', to: '/sitter/profile', icon: 'i-lucide-user-round' },
 ]
@@ -34,14 +35,7 @@ function isCurrent(item: typeof items[number]) {
         </div>
         <div class="flex items-center gap-2">
           <span class="hidden rounded-full bg-primary/5 px-3 py-1 text-xs font-semibold text-primary sm:inline-flex">Sitter workspace</span>
-          <NuxtLink
-            to="/book"
-            class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-toned transition-colors hover:bg-primary/5 hover:text-primary"
-          >
-            <UIcon name="i-lucide-repeat-2" class="size-4" aria-hidden="true" />
-            <span class="hidden sm:inline">Booker preview</span>
-            <span class="sm:hidden">Booker</span>
-          </NuxtLink>
+          <ClientOnly><UserButton /></ClientOnly>
         </div>
       </div>
     </header>
@@ -89,7 +83,7 @@ function isCurrent(item: typeof items[number]) {
 
     <nav
       aria-label="Sitter workspace"
-      class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
+      class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <NuxtLink
         v-for="item in items"

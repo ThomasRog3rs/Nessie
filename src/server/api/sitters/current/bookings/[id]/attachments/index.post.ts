@@ -8,14 +8,15 @@ import { parseValue } from '../../../../../../utils/http.ts'
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export default defineApiHandler(async (event): Promise<BookingAttachment> => {
+  const sitterId = await requireSitterId(event)
   const bookingId = parseParam(event, 'id', bookingIdSchema)
   const { fields, file } = await readUpload(event, PHOTO_TYPES)
   const { caption } = parseValue(attachmentCaptionSchema, { caption: fields.get('caption') })
   const storage = new PrivateFileStorage()
   const storageKey = await storage.put(file.contents)
   try {
-    const { sitterBookings, actors } = await useServices()
-    const attachment = sitterBookings.addAttachment(actors.sitterId(), bookingId, {
+    const { sitterBookings } = await useServices()
+    const attachment = sitterBookings.addAttachment(sitterId, bookingId, {
       id: crypto.randomUUID(),
       bookingId,
       kind: 'photo',
@@ -23,7 +24,7 @@ export default defineApiHandler(async (event): Promise<BookingAttachment> => {
       mimeType: file.mimeType,
       size: file.contents.length,
       ...(caption ? { caption } : {}),
-      creatorId: actors.sitterId(),
+      creatorId: sitterId,
       createdAt: new Date().toISOString(),
       storageKey,
     })

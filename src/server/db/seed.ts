@@ -97,7 +97,7 @@ export function isSeeded(db: Database): boolean {
 export function clearData(db: Database): void {
   for (const table of ['booking_attachments', 'sitter_expenses', 'booking_progress_updates', 'booking_history',
     'booking_incidental_expenses', 'booking_services', 'booking_pets', 'bookings', 'availability_blocks',
-    'sitter_services', 'sitter_accepted_pets', 'booker_sitter_links', 'sitters', 'bookers']) {
+    'sitter_services', 'sitter_accepted_pets', 'booker_invites', 'booker_pets', 'booker_sitter_links', 'sitters', 'bookers']) {
     db.exec(`DELETE FROM ${table}`)
   }
 }

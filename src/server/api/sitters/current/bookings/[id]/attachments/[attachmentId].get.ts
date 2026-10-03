@@ -2,10 +2,11 @@ import { bookingIdSchema } from '../../../../../../../shared/schemas/booking.ts'
 import { PrivateFileStorage } from '../../../../../../storage/PrivateFileStorage.ts'
 
 export default defineApiHandler(async (event) => {
+  const sitterId = await requireSitterId(event)
   const bookingId = parseParam(event, 'id', bookingIdSchema)
   const attachmentId = parseParam(event, 'attachmentId', bookingIdSchema)
-  const { sitterBookings, actors } = await useServices()
-  const { attachment, storageKey } = sitterBookings.getAttachment(actors.sitterId(), bookingId, attachmentId)
+  const { sitterBookings } = await useServices()
+  const { attachment, storageKey } = sitterBookings.getAttachment(sitterId, bookingId, attachmentId)
   const contents = await new PrivateFileStorage().get(storageKey)
   const safeFileName = attachment.fileName.replace(/[^a-z0-9._-]/gi, '_').slice(0, 100) || 'attachment'
   setResponseHeader(event, 'Content-Type', attachment.mimeType)

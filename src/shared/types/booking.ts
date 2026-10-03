@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { bookerProfileInputSchema } from '../schemas/account'
 import type { bookingRequestSchema, cancelBookingSchema } from '../schemas/booking'
 import type {
   agreeTimesSchema, attachmentKindSchema, availabilityBlockInputSchema, declineBookingSchema,
@@ -180,9 +181,55 @@ export type ApiErrorCode =
   | 'not_found'
   | 'conflict'
   | 'invalid_transition'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'gone'
   | 'internal_error'
 
 export interface ApiErrorData {
   code: ApiErrorCode
   fieldErrors?: Record<string, string[]>
+}
+
+export type BookerProfileInput = z.infer<typeof bookerProfileInputSchema>
+export type BookerProfile = BookerProfileInput & { email: string }
+
+export type AccountRole = 'sitter' | 'booker' | 'none'
+
+export interface AccountState {
+  signedIn: boolean
+  role: AccountRole
+  /** True only while no sitter has registered; the sitter sign-up is closed once one exists. */
+  sitterSignupOpen: boolean
+}
+
+export type InviteStatus = 'active' | 'used' | 'expired' | 'disabled'
+
+export interface BookerInvite {
+  id: string
+  label: string
+  createdAt: string
+  expiresAt: string
+  status: InviteStatus
+  usedAt?: string
+  bookerName?: string
+}
+
+/** The raw token is only ever returned from the call that creates the invite. */
+export interface CreatedBookerInvite extends BookerInvite {
+  token: string
+}
+
+export interface InvitePreview {
+  valid: boolean
+  sitterName?: string
+}
+
+export interface LinkedBooker {
+  id: string
+  name: string
+  email: string
+  phone: string
+  joinedAt: string
+  inviteLabel: string
 }
