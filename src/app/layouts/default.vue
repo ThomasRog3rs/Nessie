@@ -17,7 +17,8 @@ const items = [
 
     <header class="sticky top-0 z-30 border-b border-default bg-default/95 backdrop-blur">
       <div class="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-        <NuxtLink to="/" class="font-display text-2xl font-semibold text-primary" aria-label="Nesse home">
+        <NuxtLink to="/" class="inline-flex items-center gap-2 font-display text-2xl font-semibold text-primary" aria-label="Nesse home">
+          <img src="/favicon.png" alt="" width="36" height="36" class="size-9 shrink-0 object-contain">
           Nesse
         </NuxtLink>
         <nav aria-label="Main" class="hidden gap-1 sm:flex">

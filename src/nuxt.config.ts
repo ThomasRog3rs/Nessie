@@ -9,6 +9,10 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'en-GB' },
       title: 'Nesse',
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png', sizes: '128x128' },
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico', sizes: '32x32' },
+      ],
     },
   },
   nitro: {

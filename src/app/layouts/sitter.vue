@@ -28,7 +28,8 @@ function isCurrent(item: typeof items[number]) {
     <header class="sticky top-0 z-30 border-b border-default bg-default/95 backdrop-blur">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div class="flex min-w-0 items-center gap-3">
-          <NuxtLink to="/sitter" class="font-display text-2xl font-semibold text-primary" aria-label="Nesse sitter workspace">
+          <NuxtLink to="/sitter" class="inline-flex items-center gap-2 font-display text-2xl font-semibold text-primary" aria-label="Nesse sitter workspace">
+            <img src="/favicon.png" alt="" width="36" height="36" class="size-9 shrink-0 object-contain">
             Nesse
           </NuxtLink>
           <span class="hidden border-l border-default pl-3 text-sm font-semibold text-toned sm:inline">Sitter workspace</span>
