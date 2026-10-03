@@ -24,6 +24,10 @@ const costRows = computed(() => {
   return rows
 })
 
+const showActual = computed(() => !!booking.value && ['confirmed', 'completed'].includes(booking.value.status))
+const actual = computed(() => booking.value ? calculateActualCosts(booking.value.pricing, booking.value.sitterExpenses) : undefined)
+const receiptUrl = (receiptId: string) => `/api/bookings/${id}/receipts/${receiptId}`
+
 const cancelOpen = ref(false)
 const reason = ref('')
 const cancelling = ref(false)
@@ -33,7 +37,8 @@ async function cancel() {
   cancelling.value = true
   cancelError.value = undefined
   try {
-    booking.value = await api.cancelBooking(id, { reason: reason.value })
+    await api.cancelBooking(id, { reason: reason.value })
+    await refresh()
     clearNuxtData(['bookings', 'availability'])
     cancelOpen.value = false
     toast.add({ title: 'Booking cancelled', description: 'The sitter will be notified.', icon: 'i-lucide-ban', color: 'neutral' })
@@ -92,14 +97,40 @@ async function cancel() {
         </UCard>
 
         <UCard>
-          <h2 class="text-lg font-semibold">Costs</h2>
+          <h2 class="text-lg font-semibold">Proposed costs</h2>
+          <p class="mt-1 text-sm text-muted">The estimate agreed when you made the request.</p>
           <dl class="mt-3 space-y-2">
             <div v-for="(r, i) in costRows" :key="i" class="flex justify-between gap-4">
               <dt>{{ r.label }}</dt><dd class="font-semibold">{{ formatMoney(r.amount) }}</dd>
             </div>
+            <div class="flex justify-between gap-4 border-t border-default pt-2">
+              <dt class="font-semibold">Proposed total</dt><dd class="font-semibold">{{ formatMoney(booking.pricing.total) }}</dd>
+            </div>
           </dl>
           <p v-if="booking.travelReimbursement.notes" class="mt-2 text-sm text-muted">Travel: {{ booking.travelReimbursement.notes }}</p>
           <p class="mt-3 text-sm text-muted">Recorded terms only; payment happens outside Nesse.</p>
+        </UCard>
+
+        <UCard v-if="showActual && actual">
+          <h2 class="text-lg font-semibold">Actual costs</h2>
+          <p class="mt-1 text-sm text-muted">Sitting and services as agreed, plus the travel and incidental expenses {{ booking.sitterName }} has recorded.</p>
+          <dl class="mt-3 space-y-2">
+            <div class="flex justify-between gap-4"><dt>Sitting ({{ nights }} × {{ formatMoney(booking.rate) }})</dt><dd class="font-semibold">{{ formatMoney(actual.sitting) }}</dd></div>
+            <div v-if="actual.services" class="flex justify-between gap-4"><dt>Services</dt><dd class="font-semibold">{{ formatMoney(actual.services) }}</dd></div>
+            <div v-for="e in booking.sitterExpenses" :key="e.id" class="flex justify-between gap-4">
+              <dt class="min-w-0">
+                {{ e.category === 'travel' ? 'Travel' : 'Incidental' }}: {{ e.description }}
+                <a v-if="e.receipt" :href="receiptUrl(e.receipt.id)" target="_blank" rel="noopener noreferrer" class="flex min-h-10 items-center gap-1 text-sm font-semibold text-primary hover:underline">
+                  View receipt <UIcon name="i-lucide-external-link" class="size-4" aria-hidden="true" />
+                </a>
+              </dt>
+              <dd class="shrink-0 font-semibold">{{ formatMoney(e.amount) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4 border-t border-default pt-2">
+              <dt class="font-semibold">Actual total</dt><dd class="font-semibold">{{ formatMoney(actual.total) }}</dd>
+            </div>
+          </dl>
+          <p v-if="!booking.sitterExpenses.length" class="mt-2 text-sm text-muted">No expenses have been recorded yet.</p>
         </UCard>
 
         <UCard>

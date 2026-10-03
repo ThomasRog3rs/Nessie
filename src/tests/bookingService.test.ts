@@ -13,7 +13,7 @@ describe('booker booking flow', () => {
     expect(booking.status).toBe('requested')
     expect(booking.pricing).toMatchObject({ nights: 2, sitting: 9000, services: 1600, total: 10600 })
     expect(booking.history).toHaveLength(1)
-    expect(ctx.services.bookings.get(ctx.bookerId, booking.id)).toEqual(booking)
+    expect(ctx.services.bookings.get(ctx.bookerId, booking.id)).toEqual({ ...booking, sitterExpenses: [] })
     expect(ctx.services.availability.getDays(ctx.sitterId, addDays(TODAY, 3), addDays(TODAY, 3))[0]!.status).toBe('booked')
   })
 

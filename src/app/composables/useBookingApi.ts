@@ -7,7 +7,7 @@ export function useBookingApi() {
     getAvailability: (from: string, to: string) =>
       $fetch<AvailabilityDay[]>('/api/sitters/current/availability', { query: { from, to } }),
     listBookings: () => $fetch<Booking[]>('/api/bookings'),
-    getBooking: (id: string) => $fetch<Booking>(`/api/bookings/${id}`),
+    getBooking: (id: string) => $fetch<BookerBooking>(`/api/bookings/${id}`),
     createBooking: (body: BookingRequest) =>
       $fetch<Booking>('/api/bookings', { method: 'POST', body }),
     cancelBooking: (id: string, body: CancelBookingRequest) =>

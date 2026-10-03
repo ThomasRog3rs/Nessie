@@ -101,6 +101,27 @@ describe('sitter profile and booking workspace', () => {
     context.db.close()
   })
 
+  it('shows the booker recorded expenses and receipts, but not other bookers\' receipts', async () => {
+    const context = await createContext()
+    const { bookings, sitterBookings } = context.services
+    const booking = bookings.create(context.bookerId, bookingRequest(3, 5))
+    sitterBookings.accept(context.sitterId, booking.id)
+    sitterBookings.agreeTimes(context.sitterId, booking.id, { arrivalTime: '10:00', departureTime: '17:00' })
+    sitterBookings.addExpense(context.sitterId, booking.id, { category: 'travel', description: 'Train', amount: 2800 }, {
+      id: 'receipt-1', bookingId: booking.id, kind: 'receipt', fileName: 'train.pdf', mimeType: 'application/pdf',
+      size: 10, creatorId: context.sitterId, createdAt: new Date().toISOString(), storageKey: 'key-1',
+    })
+
+    const detail = bookings.get(context.bookerId, booking.id)
+    expect(detail.sitterExpenses).toHaveLength(1)
+    expect(detail.sitterExpenses[0]).toMatchObject({ amount: 2800, receipt: { id: 'receipt-1' } })
+    expect(JSON.stringify(detail)).not.toContain('key-1')
+    expect(bookings.getReceipt(context.bookerId, booking.id, 'receipt-1').storageKey).toBe('key-1')
+    expect(() => bookings.getReceipt('someone-else', booking.id, 'receipt-1')).toThrow(NotFoundError)
+    expect(() => bookings.getReceipt(context.bookerId, booking.id, 'missing')).toThrow(NotFoundError)
+    context.db.close()
+  })
+
   it('rejects overlapping unavailable blocks and records explicit cancellation history', async () => {
     const context = await createContext()
     const booking = context.services.bookings.create(context.bookerId, bookingRequest(3, 5))

@@ -156,6 +156,9 @@ export interface Booking extends BookingRequest {
   history: BookingHistoryEntry[]
 }
 
+/** What the booker sees for one booking: the proposal plus the costs the sitter actually recorded. */
+export type BookerBooking = Booking & { sitterExpenses: SitterExpense[] }
+
 export type SitterBooking = Omit<Booking,
   'propertyInstructions' | 'emergencyContact' | 'vet' | 'emergencyInstructions'
 > & {

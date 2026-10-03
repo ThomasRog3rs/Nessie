@@ -1,4 +1,4 @@
-import type { Booking, BookingRequest, Sitter } from '../../shared/types/booking.ts'
+import type { BookerBooking, Booking, BookingAttachment, BookingRequest, Sitter } from '../../shared/types/booking.ts'
 import { calculatePricing } from '../../shared/utils/pricing.ts'
 import { stayNights, todayInTimeZone } from '../../shared/utils/dateRange.ts'
 import { ConflictError, NotFoundError, ValidationError } from '../domain/errors.ts'
@@ -30,8 +30,17 @@ export class BookingService {
     return this.deps.queries.listForBooker(bookerId)
   }
 
-  get(bookerId: string, bookingId: string): Booking {
-    return this.require(bookerId, bookingId)
+  get(bookerId: string, bookingId: string): BookerBooking {
+    const booking = this.require(bookerId, bookingId)
+    return { ...booking, sitterExpenses: this.deps.queries.listSitterExpenses(booking.id) }
+  }
+
+  getReceipt(bookerId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
+    this.require(bookerId, bookingId)
+    const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
+    const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+    if (!attachment || attachment.kind !== 'receipt' || !storageKey) throw new NotFoundError('Receipt not found')
+    return { attachment, storageKey }
   }
 
   create(bookerId: string, request: BookingRequest): Booking {

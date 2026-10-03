@@ -20,3 +20,24 @@ export function calculatePricing(input: PricingInput): BookingPricing {
     total: sitting + services + input.travelAmount + incidentals,
   }
 }
+
+export interface ActualCosts {
+  sitting: Money
+  services: Money
+  travel: Money
+  incidentals: Money
+  total: Money
+}
+
+/** Actual costs: the agreed sitting and services plus what the sitter really recorded, replacing the proposed travel and incidentals. */
+export function calculateActualCosts(pricing: BookingPricing, expenses: ReadonlyArray<{ category: 'travel' | 'incidental', amount: Money }>): ActualCosts {
+  const travel = expenses.filter(e => e.category === 'travel').reduce((sum, e) => sum + e.amount, 0)
+  const incidentals = expenses.filter(e => e.category === 'incidental').reduce((sum, e) => sum + e.amount, 0)
+  return {
+    sitting: pricing.sitting,
+    services: pricing.services,
+    travel,
+    incidentals,
+    total: pricing.sitting + pricing.services + travel + incidentals,
+  }
+}
