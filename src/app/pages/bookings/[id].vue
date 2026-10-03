@@ -10,13 +10,16 @@ useHead({ title: 'Booking · Nesse' })
 const nights = computed(() => booking.value ? nightsBetween(booking.value.startDate, booking.value.endDate) : 0)
 const meta = computed(() => booking.value ? BOOKING_STATUS_META[booking.value.status] : undefined)
 const canCancel = computed(() => booking.value && ['requested', 'accepted_times_pending', 'confirmed'].includes(booking.value.status))
-const timesAgreed = computed(() => booking.value?.status === 'confirmed' || booking.value?.status === 'completed')
+const timesAgreed = computed(() => booking.value?.agreedArrivalTime != null)
+const arrivalTime = computed(() => booking.value?.agreedArrivalTime ?? booking.value?.arrivalTime)
+const departureTime = computed(() => booking.value?.agreedDepartureTime ?? booking.value?.departureTime)
 
 const costRows = computed(() => {
   const b = booking.value
   if (!b) return []
-  const rows = [{ label: `Sitting (${nights.value} × ${formatMoney(b.rate)})`, amount: nights.value * b.rate }]
-  rows.push({ label: 'Travel reimbursement', amount: b.travelReimbursement.amount })
+  const rows = [{ label: `Sitting (${nights.value} × ${formatMoney(b.rate)})`, amount: b.pricing.sitting }]
+  for (const s of b.services) rows.push({ label: `${s.name} (${nights.value} × ${formatMoney(s.price)})`, amount: s.price * nights.value })
+  rows.push({ label: 'Travel reimbursement', amount: b.pricing.travel })
   for (const e of b.incidentalExpenses) rows.push({ label: `Incidental: ${e.description}`, amount: e.amount })
   return rows
 })
@@ -31,6 +34,7 @@ async function cancel() {
   cancelError.value = undefined
   try {
     booking.value = await api.cancelBooking(id, { reason: reason.value })
+    clearNuxtData(['bookings', 'availability'])
     cancelOpen.value = false
     toast.add({ title: 'Booking cancelled', description: 'The sitter will be notified.', icon: 'i-lucide-ban', color: 'neutral' })
   }
@@ -74,11 +78,11 @@ async function cancel() {
           <dl class="mt-3 space-y-3">
             <div>
               <dt class="text-sm text-muted">Arrive</dt>
-              <dd class="font-semibold">{{ formatDate(booking.startDate) }} · {{ booking.arrivalTime }}</dd>
+              <dd class="font-semibold">{{ formatDate(booking.startDate) }} · {{ arrivalTime }}</dd>
             </div>
             <div>
               <dt class="text-sm text-muted">Depart</dt>
-              <dd class="font-semibold">{{ formatDate(booking.endDate) }} · {{ booking.departureTime }}</dd>
+              <dd class="font-semibold">{{ formatDate(booking.endDate) }} · {{ departureTime }}</dd>
             </div>
           </dl>
           <p class="mt-3 text-sm" :class="timesAgreed ? 'text-success' : 'text-warning'">

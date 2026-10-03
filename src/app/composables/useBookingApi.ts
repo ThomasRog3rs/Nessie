@@ -1,4 +1,6 @@
-// Single place that talks to the backend; swap endpoints here if the contract changes.
+import type { FetchError } from 'ofetch'
+
+// Single place that talks to the booker-facing backend; swap endpoints here if the contract changes.
 export function useBookingApi() {
   return {
     getSitter: () => $fetch<Sitter>('/api/sitters/current'),
@@ -13,7 +15,21 @@ export function useBookingApi() {
   }
 }
 
-export function apiErrorMessage(e: unknown, fallback = 'Something went wrong. Please try again.'): string {
-  const err = e as { data?: { statusMessage?: string, message?: string }, statusMessage?: string }
-  return err?.data?.statusMessage || err?.data?.message || err?.statusMessage || fallback
+type ApiFetchError = FetchError<{ statusMessage?: string, message?: string, data?: ApiErrorData }>
+
+function asFetchError(error: unknown): ApiFetchError | undefined {
+  return error instanceof Error && 'statusCode' in error ? error as ApiFetchError : undefined
+}
+
+/** Human-readable message for a failed API call, including per-field validation detail. */
+export function apiErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  const fetchError = asFetchError(error)
+  const base = fetchError?.data?.statusMessage || fetchError?.data?.message || fetchError?.statusMessage
+  const details = Object.values(fetchError?.data?.data?.fieldErrors ?? {}).flat()
+  if (details.length > 0) return `${base ?? fallback}: ${details.join(' ')}`
+  return base || fallback
+}
+
+export function isConflictError(error: unknown): boolean {
+  return asFetchError(error)?.statusCode === 409
 }

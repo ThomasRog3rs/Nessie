@@ -16,14 +16,13 @@ const services = computed(() =>
 const totals = computed(() => {
   const r = request.value
   if (!r || !sitter.value) return undefined
-  const sitting = draft.nights * sitter.value.rate
-  const svc = services.value.reduce((n, s) => n + s.price * draft.nights, 0)
-  return {
-    sitting,
-    services: svc,
-    travel: r.travelReimbursement.amount,
-    incidentals: r.incidentalExpenses.reduce((n, e) => n + e.amount, 0),
-  }
+  return calculatePricing({
+    nights: draft.nights,
+    rate: sitter.value.rate,
+    services: services.value,
+    travelAmount: r.travelReimbursement.amount,
+    incidentalExpenses: r.incidentalExpenses,
+  })
 })
 
 const submitting = ref(false)
@@ -35,12 +34,15 @@ async function submit() {
   error.value = undefined
   try {
     const booking = await api.createBooking(request.value)
+    clearNuxtData(['bookings', 'availability'])
     toast.add({ title: 'Request sent', description: 'Your sitter has been asked to accept or decline.', icon: 'i-lucide-circle-check', color: 'success' })
     await navigateTo(`/bookings/${booking.id}`)
     draft.$reset()
   }
   catch (e) {
     error.value = apiErrorMessage(e)
+    // Someone else may have taken the dates; reload availability on the date step.
+    if (isConflictError(e)) clearNuxtData('availability')
     document.getElementById('submit-error')?.focus()
   }
   finally {
