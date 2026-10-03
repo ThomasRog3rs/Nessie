@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nesse · design prototype</title>
+  <meta name="description" content="Static design prototype for Nesse, an invite-only house- and pet-sitting coordination app.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            evergreen: { DEFAULT: '#173F35', 700: '#215246', 100: '#D8E5DF', 50: '#EBF2EE' },
+            paper: '#F7F8F4',
+            ink: '#26312F',
+            muted: '#55625F',
+            line: '#D6DAD0',
+            coral: { DEFAULT: '#D9674E', deep: '#B0412A', tint: '#FBE8E2' },
+            pale: { DEFAULT: '#DCECEF', deep: '#BDD8DE' },
+            ok: { DEFAULT: '#1D6A3B', tint: '#DDF0E3' },
+            warn: { DEFAULT: '#7A4A00', tint: '#FBEBC8' },
+            bad: { DEFAULT: '#A12A2A', tint: '#F8DEDC' }
+          },
+          fontFamily: {
+            display: ['Fraunces', 'Georgia', 'Cambria', 'serif'],
+            sans: ['"Source Sans 3"', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      html { scroll-behavior: smooth; }
+      body { @apply bg-paper text-ink font-sans text-[17px] leading-relaxed antialiased; font-variant-numeric: tabular-nums; }
+      h1, h2, h3 { @apply font-display text-evergreen; }
+      :focus-visible { outline: 3px solid #D9674E; outline-offset: 2px; border-radius: 6px; }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      }
+    }
+    @layer components {
+      .btn { @apply inline-flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-lg px-5 py-2 text-[17px] font-semibold transition-colors duration-200; touch-action: manipulation; }
+      .btn-primary { @apply bg-evergreen text-white hover:bg-evergreen-700; }
+      .btn-outline { @apply border border-evergreen/40 bg-white text-evergreen hover:bg-evergreen-50; }
+      .btn-danger { @apply border border-bad/40 bg-white text-bad hover:bg-bad-tint; }
+      .btn-quiet { @apply min-h-[44px] px-3 text-evergreen underline decoration-evergreen/30 underline-offset-4 hover:decoration-evergreen; }
+      .chip { @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold; }
+      .eyebrow { @apply text-sm font-semibold uppercase tracking-[0.08em] text-muted; }
+      .rule { @apply border-t border-line; }
+      .label { @apply mb-1.5 block text-base font-semibold text-ink; }
+      .help { @apply mt-1.5 text-[15px] text-muted; }
+      .input { @apply min-h-[48px] w-full rounded-lg border border-evergreen/40 bg-white px-3.5 py-2 text-[17px] text-ink; }
+      .ico { @apply h-5 w-5 shrink-0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+      .leader { @apply flex items-baseline gap-3; }
+      .leader::after { content: ''; order: 2; @apply min-w-4 flex-1 border-b border-dotted border-evergreen/40; }
+      .leader > :first-child { order: 1; }
+      .leader > :last-child { order: 3; @apply font-semibold; }
+      .cal { @apply grid grid-cols-7 gap-1; }
+      .cal-day { @apply relative flex aspect-square min-h-[44px] flex-col items-center justify-center rounded-md text-base font-semibold; }
+      .cal-open { @apply bg-white text-ink ring-1 ring-line; }
+      .cal-off { color: #55625F; background: repeating-linear-gradient(135deg, #E9EBE4 0 5px, #F7F8F4 5px 10px); @apply ring-1 ring-line; }
+      .cal-booked { @apply bg-evergreen text-white; }
+      .cal-pending { @apply bg-coral-tint text-coral-deep; outline: 2px dashed #B0412A; outline-offset: -3px; }
+      .cal-sel { @apply bg-evergreen-100 text-evergreen; }
+      .cal-edge { @apply bg-evergreen text-white; }
+      .nav-link { @apply flex min-h-[48px] items-center gap-3 rounded-lg px-3 text-[17px] font-semibold text-evergreen/80 transition-colors duration-200 hover:bg-evergreen-50; }
+      .nav-link[aria-current="page"] { @apply bg-evergreen text-white; }
+      .tab-link { @apply flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs font-semibold text-evergreen/80; }
+      .tab-link[aria-current="page"] { @apply text-evergreen; box-shadow: inset 0 3px 0 #D9674E; background: #EBF2EE; }
+    }
+  </style>
+</head>
+<body class="min-h-dvh">
+
+<!-- Icon sprite (Lucide-style, 1.75 stroke) -->
+<svg xmlns="http://www.w3.org/2000/svg" class="hidden" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24"><circle cx="5.5" cy="11" r="1.8"/><circle cx="9.5" cy="6.5" r="1.8"/><circle cx="14.5" cy="6.5" r="1.8"/><circle cx="18.5" cy="11" r="1.8"/><path d="M12 12.5c-3 0-5.5 3-5.5 5.2 0 1.6 1.4 2.3 3 2.3 1 0 1.6-.4 2.5-.4s1.5.4 2.5.4c1.6 0 3-.7 3-2.3 0-2.2-2.5-5.2-5.5-5.2Z"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l8-8"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 2.5v19l2.5-1.5 2.5 1.5 2-1.5 2 1.5 2.5-1.5L19 21.5v-19L16.5 4 14 2.5 12 4 10 2.5 7.5 4Z"/><path d="M9 9h6M9 13h6"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></symbol>
+</svg>
+
+<a href="#main" class="sr-only z-50 rounded-md bg-white px-4 py-3 font-semibold text-evergreen focus:not-sr-only focus:fixed focus:left-3 focus:top-3" onclick="document.getElementById('main').focus()">Skip to main content</a>
+
+<div class="mx-auto flex min-h-dvh max-w-[1280px]">
+
+  <!-- Desktop sidebar -->
+  <aside class="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-line px-5 py-7 lg:flex">
+    <a href="#home" class="flex items-center gap-3 px-2" aria-label="Nesse home">
+      <svg viewBox="0 0 40 40" class="h-10 w-10" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#173F35"/><path d="M9 21 20 11.5 31 21" fill="none" stroke="#F7F8F4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 20v9h14v-9" fill="none" stroke="#F7F8F4" stroke-width="2.4" stroke-linejoin="round"/><circle cx="20" cy="25" r="2.2" fill="#D9674E"/></svg>
+      <span class="font-display text-3xl font-semibold text-evergreen">Nesse</span>
+    </a>
+
+    <nav aria-label="Prototype screens" class="mt-10 flex-1 space-y-7">
+      <div>
+        <p class="eyebrow px-3 pb-2">As Maya (booker)</p>
+        <ul class="space-y-1">
+          <li><a class="nav-link" href="#home" data-nav="home"><svg class="ico"><use href="#i-home"/></svg>Home</a></li>
+          <li><a class="nav-link" href="#request" data-nav="request"><svg class="ico"><use href="#i-pen"/></svg>Request a sit</a></li>
+          <li><a class="nav-link" href="#booking" data-nav="booking"><svg class="ico"><use href="#i-book"/></svg>Booking record</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="eyebrow px-3 pb-2">As Tom (sitter)</p>
+        <ul class="space-y-1">
+          <li><a class="nav-link" href="#availability" data-nav="availability"><svg class="ico"><use href="#i-calendar"/></svg>Availability</a></li>
+          <li><a class="nav-link" href="#review" data-nav="review"><svg class="ico"><use href="#i-inbox"/></svg>Requests<span class="ml-auto rounded-full bg-coral-deep px-2 text-sm text-white" aria-label="1 new">1</span></a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="rounded-lg bg-pale p-4 text-[15px] leading-snug text-ink">
+      <p class="flex items-center gap-2 font-semibold"><svg class="ico"><use href="#i-lock"/></svg>Invite-only</p>
+      <p class="mt-1">Nesse is private. Only people you’ve been invited to share with can see your details.</p>
+    </div>
+    <p class="mt-4 px-1 text-sm text-muted">Design prototype · sample data only</p>
+  </aside>
+
+  <div class="flex min-w-0 flex-1 flex-col">
+    <!-- Mobile top bar -->
+    <header class="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-paper/95 px-4 py-2.5 backdrop-blur lg:hidden">
+      <a href="#home" class="flex items-center gap-2" aria-label="Nesse home">
+        <svg viewBox="0 0 40 40" class="h-8 w-8" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#173F35"/><path d="M9 21 20 11.5 31 21" fill="none" stroke="#F7F8F4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 20v9h14v-9" fill="none" stroke="#F7F8F4" stroke-width="2.4" stroke-linejoin="round"/><circle cx="20" cy="25" r="2.2" fill="#D9674E"/></svg>
+        <span class="font-display text-2xl font-semibold text-evergreen">Nesse</span>
+      </a>
+      <span class="chip bg-pale text-ink"><svg class="ico !h-4 !w-4"><use href="#i-lock"/></svg>Prototype</span>
+    </header>
+
+    <main id="main" tabindex="-1" class="flex-1 px-5 pb-32 pt-8 outline-none sm:px-8 lg:px-12 lg:pb-16 lg:pt-12">
+
+      <!-- ============ HOME ============ -->
+      <section data-screen="home" aria-labelledby="home-h">
+        <p class="eyebrow">Booker view · Maya Okafor</p>
+        <h1 id="home-h" class="mt-1 text-4xl font-semibold leading-tight sm:text-5xl">Good morning, Maya.</h1>
+        <p class="mt-3 max-w-prose text-lg text-muted">One thing needs your attention before Tom’s stay with Biscuit and Juniper.</p>
+
+        <div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div>
+            <!-- Next stay -->
+            <article class="relative overflow-hidden rounded-2xl bg-evergreen p-6 text-paper sm:p-8" aria-labelledby="next-h">
+              <p class="text-sm font-semibold uppercase tracking-[0.08em] text-evergreen-100">Next stay</p>
+              <h2 id="next-h" class="mt-2 font-display text-3xl font-semibold !text-paper sm:text-4xl">Saturday 14 – Wednesday 18 November</h2>
+              <p class="mt-1 text-evergreen-100">4 nights at your home · Tom Reyes looking after Biscuit and Juniper</p>
+
+              <dl class="mt-7 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/15 text-base">
+                <div class="bg-evergreen p-4">
+                  <dt class="text-sm text-evergreen-100">Arrival</dt>
+                  <dd class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xl font-semibold"><svg class="ico text-paper"><use href="#i-check"/></svg>10:00 <span class="block basis-full text-base font-normal text-evergreen-100">Agreed</span></dd>
+                </div>
+                <div class="bg-evergreen p-4">
+                  <dt class="text-sm text-evergreen-100">Departure</dt>
+                  <dd class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xl font-semibold"><svg class="ico"><use href="#i-clock"/></svg>16:00 <span class="block basis-full text-base font-normal text-evergreen-100">Awaiting you</span></dd>
+                </div>
+              </dl>
+
+              <div class="mt-6 flex flex-wrap items-center gap-3">
+                <a href="#booking" class="btn bg-paper text-evergreen hover:bg-white">Review departure time<svg class="ico"><use href="#i-arrow"/></svg></a>
+                <span class="chip bg-coral-tint text-coral-deep"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg>Accepted · times pending</span>
+              </div>
+            </article>
+
+            <!-- Pets -->
+            <section class="mt-10" aria-labelledby="pets-h">
+              <h2 id="pets-h" class="text-2xl font-semibold">Who’s being looked after</h2>
+              <ul class="mt-4 divide-y divide-line border-y border-line">
+                <li class="flex items-start gap-4 py-4">
+                  <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-pale text-evergreen"><svg class="ico"><use href="#i-paw"/></svg></span>
+                  <div><p class="font-semibold">Biscuit <span class="font-normal text-muted">· beagle, 11</span></p><p class="text-[16px] text-muted">Two walks a day, joint tablet with breakfast. Dislikes fireworks.</p></div>
+                </li>
+                <li class="flex items-start gap-4 py-4">
+                  <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-pale text-evergreen"><svg class="ico"><use href="#i-paw"/></svg></span>
+                  <div><p class="font-semibold">Juniper <span class="font-normal text-muted">· tabby cat, 4</span></p><p class="text-[16px] text-muted">Indoor cat. Wet food twice daily; loves the window seat.</p></div>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <aside class="space-y-9" aria-label="Activity">
+            <section aria-labelledby="todo-h">
+              <h2 id="todo-h" class="text-2xl font-semibold">Needs you</h2>
+              <ul class="mt-4 space-y-3">
+                <li>
+                  <a href="#booking" class="group flex items-start gap-3 rounded-xl border border-coral-deep/40 bg-coral-tint p-4 transition-colors duration-200 hover:border-coral-deep">
+                    <svg class="ico mt-0.5 text-coral-deep"><use href="#i-clock"/></svg>
+                    <span class="flex-1"><span class="block font-semibold text-ink">Confirm departure time</span><span class="text-[16px] text-ink/80">Tom proposed 16:00 on Wed 18 Nov.</span></span>
+                    <svg class="ico mt-0.5 text-coral-deep transition-transform duration-200 group-hover:translate-x-0.5"><use href="#i-chev-r"/></svg>
+                  </a>
+                </li>
+                <li class="flex items-start gap-3 rounded-xl border border-line bg-white p-4">
+                  <svg class="ico mt-0.5 text-evergreen"><use href="#i-info"/></svg>
+                  <span><span class="block font-semibold">Add vet details</span><span class="text-[16px] text-muted">Optional until the stay is confirmed.</span></span>
+                </li>
+              </ul>
+            </section>
+
+            <section aria-labelledby="recent-h">
+              <h2 id="recent-h" class="text-2xl font-semibold">Recent activity</h2>
+              <ol class="mt-4 space-y-4 border-l border-line pl-5 text-[16px]">
+                <li><span class="eyebrow block !text-xs">Today · 09:12</span>Tom proposed a 16:00 departure.</li>
+                <li><span class="eyebrow block !text-xs">Yesterday · 18:40</span>Tom accepted your request.</li>
+                <li><span class="eyebrow block !text-xs">Mon 5 Oct · 20:05</span>You sent a request for 14–18 Nov.</li>
+              </ol>
+            </section>
+
+            <a href="#request" class="btn btn-outline w-full"><svg class="ico"><use href="#i-plus"/></svg>Request another sit</a>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ AVAILABILITY ============ -->
+      <section data-screen="availability" aria-labelledby="avail-h" hidden>
+        <p class="eyebrow">Sitter view · Tom Reyes</p>
+        <h1 id="avail-h" class="mt-1 text-4xl font-semibold leading-tight sm:text-5xl">Your availability</h1>
+        <p class="mt-3 max-w-prose text-lg text-muted">Mark the days you can’t sit. Bookers will see these as unavailable and can’t request them.</p>
+
+        <div class="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <section aria-labelledby="cal-h">
+            <div class="flex items-center justify-between">
+              <h2 id="cal-h" class="text-3xl font-semibold">November 2026</h2>
+              <div class="flex gap-1">
+                <button type="button" data-mock="Previous month" class="grid h-12 w-12 cursor-pointer place-items-center rounded-lg text-evergreen transition-colors duration-200 hover:bg-evergreen-50" aria-label="Previous month"><svg class="ico"><use href="#i-chev-l"/></svg></button>
+                <button type="button" data-mock="Next month" class="grid h-12 w-12 cursor-pointer place-items-center rounded-lg text-evergreen transition-colors duration-200 hover:bg-evergreen-50" aria-label="Next month"><svg class="ico"><use href="#i-chev-r"/></svg></button>
+              </div>
+            </div>
+            <div class="mt-4" role="group" aria-label="Calendar, November 2026">
+              <div class="cal mb-1 text-center text-sm font-semibold text-muted" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <div class="cal" data-calendar="availability"></div>
+            </div>
+
+            <ul class="mt-6 grid grid-cols-2 gap-x-4 gap-y-3 text-[16px] sm:grid-cols-4" aria-label="Calendar key">
+              <li class="flex items-center gap-2"><span class="cal-day cal-open !aspect-auto !min-h-0 h-8 w-8"></span>Open</li>
+              <li class="flex items-center gap-2"><span class="cal-day cal-off !aspect-auto !min-h-0 h-8 w-8"><svg class="ico !h-4 !w-4"><use href="#i-x"/></svg></span>Unavailable</li>
+              <li class="flex items-center gap-2"><span class="cal-day cal-pending !aspect-auto !min-h-0 h-8 w-8"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg></span>Times pending</li>
+              <li class="flex items-center gap-2"><span class="cal-day cal-booked !aspect-auto !min-h-0 h-8 w-8"><svg class="ico !h-4 !w-4"><use href="#i-check"/></svg></span>Confirmed</li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="blocks-h">
+            <div class="flex items-center justify-between gap-3">
+              <h2 id="blocks-h" class="text-2xl font-semibold">Your blocks</h2>
+              <button type="button" data-mock="Add unavailable dates" class="btn btn-primary"><svg class="ico"><use href="#i-plus"/></svg>Block dates</button>
+            </div>
+            <ul class="mt-5 divide-y divide-line border-y border-line">
+              <li class="flex items-center gap-4 py-4">
+                <div class="flex-1"><p class="font-semibold">Tue 3 – Thu 5 Nov</p><p class="text-[16px] text-muted">Away · all day</p></div>
+                <button type="button" data-mock="Edit block" class="btn-quiet cursor-pointer">Edit</button>
+              </li>
+              <li class="flex items-center gap-4 py-4">
+                <div class="flex-1"><p class="font-semibold">Tue 24 – Fri 27 Nov</p><p class="text-[16px] text-muted">Family visit · all day</p></div>
+                <button type="button" data-mock="Edit block" class="btn-quiet cursor-pointer">Edit</button>
+              </li>
+            </ul>
+
+            <h3 class="mt-9 text-xl font-semibold">Bookings in this view</h3>
+            <ul class="mt-3 divide-y divide-line border-y border-line">
+              <li class="flex items-start gap-3 py-4"><svg class="ico mt-1 text-evergreen"><use href="#i-check"/></svg><div><p class="font-semibold">Sat 7 – Mon 9 Nov · Confirmed</p><p class="text-[16px] text-muted">Priya Nair · Poppy, whippet</p></div></li>
+              <li class="flex items-start gap-3 py-4"><svg class="ico mt-1 text-coral-deep"><use href="#i-clock"/></svg><div><p class="font-semibold">Sat 14 – Wed 18 Nov · Times pending</p><p class="text-[16px] text-muted">Maya Okafor · Biscuit and Juniper</p></div></li>
+            </ul>
+            <p class="mt-5 flex items-start gap-2 rounded-lg bg-pale p-4 text-[16px]"><svg class="ico mt-0.5"><use href="#i-info"/></svg>If a request overlaps a block or another booking, we’ll warn the booker and stop it being confirmed twice.</p>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ REQUEST ============ -->
+      <section data-screen="request" aria-labelledby="req-h" hidden>
+        <p class="eyebrow">Booker view · Maya Okafor</p>
+        <h1 id="req-h" class="mt-1 text-4xl font-semibold leading-tight sm:text-5xl">Request a sit with Tom</h1>
+        <p class="mt-3 max-w-prose text-lg text-muted">Tom replies in Nesse. Until he does, your request stays pending — silence never cancels it.</p>
+
+        <form class="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]" aria-label="Sit request (prototype)">
+          <div class="space-y-12">
+            <fieldset>
+              <legend class="font-display text-2xl font-semibold text-evergreen"><span class="mr-2 text-coral-deep">1</span>Choose your dates</legend>
+              <p class="help">Tap a start date, then an end date. Striped days aren’t available.</p>
+              <div class="mt-4 max-w-md">
+                <div class="flex items-center justify-between">
+                  <p class="font-display text-xl font-semibold text-evergreen" id="picker-month">November 2026</p>
+                  <div class="flex gap-1">
+                    <button type="button" data-mock="Previous month" class="grid h-12 w-12 cursor-pointer place-items-center rounded-lg text-evergreen hover:bg-evergreen-50" aria-label="Previous month"><svg class="ico"><use href="#i-chev-l"/></svg></button>
+                    <button type="button" data-mock="Next month" class="grid h-12 w-12 cursor-pointer place-items-center rounded-lg text-evergreen hover:bg-evergreen-50" aria-label="Next month"><svg class="ico"><use href="#i-chev-r"/></svg></button>
+                  </div>
+                </div>
+                <div class="cal mb-1 mt-2 text-center text-sm font-semibold text-muted" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+                <div class="cal" data-calendar="picker"></div>
+              </div>
+              <p class="mt-4 flex items-center gap-2 rounded-lg bg-evergreen-50 px-4 py-3 font-semibold text-evergreen"><svg class="ico"><use href="#i-calendar"/></svg>Sat 14 Nov → Wed 18 Nov · 4 nights</p>
+            </fieldset>
+
+            <fieldset>
+              <legend class="font-display text-2xl font-semibold text-evergreen"><span class="mr-2 text-coral-deep">2</span>Preferred handover times</legend>
+              <p class="help flex items-start gap-2"><svg class="ico mt-0.5"><use href="#i-info"/></svg>These are requested times. Tom confirms or proposes exact times once he accepts.</p>
+              <div class="mt-4 grid gap-5 sm:grid-cols-2">
+                <div><label class="label" for="arr">Arrival</label><input class="input" id="arr" type="time" value="10:00"></div>
+                <div><label class="label" for="dep">Departure</label><input class="input" id="dep" type="time" value="15:00"></div>
+              </div>
+              <p class="help">Times are in the property’s timezone (UK time).</p>
+            </fieldset>
+
+            <fieldset>
+              <legend class="font-display text-2xl font-semibold text-evergreen"><span class="mr-2 text-coral-deep">3</span>Care details</legend>
+              <div class="mt-4 space-y-5">
+                <div>
+                  <p class="label" id="pets-l">Pets</p>
+                  <div class="flex flex-wrap gap-3" role="group" aria-labelledby="pets-l">
+                    <label class="flex min-h-[48px] cursor-pointer items-center gap-2.5 rounded-lg border border-evergreen/40 bg-white px-4"><input type="checkbox" checked class="h-5 w-5 accent-evergreen">Biscuit (dog)</label>
+                    <label class="flex min-h-[48px] cursor-pointer items-center gap-2.5 rounded-lg border border-evergreen/40 bg-white px-4"><input type="checkbox" checked class="h-5 w-5 accent-evergreen">Juniper (cat)</label>
+                  </div>
+                </div>
+                <div>
+                  <p class="label" id="svc-l">Optional services</p>
+                  <div class="space-y-2" role="group" aria-labelledby="svc-l">
+                    <label class="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border border-evergreen/40 bg-white px-4"><input type="checkbox" checked class="h-5 w-5 accent-evergreen"><span class="flex-1">Medication with meals</span><span class="font-semibold">£10 total</span></label>
+                    <label class="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border border-evergreen/40 bg-white px-4"><input type="checkbox" class="h-5 w-5 accent-evergreen"><span class="flex-1">Extra midday walk</span><span class="font-semibold">£8 per day</span></label>
+                  </div>
+                </div>
+                <div>
+                  <label class="label" for="notes">Anything Tom should know?</label>
+                  <textarea id="notes" rows="4" class="input !min-h-[7rem]">Biscuit’s tablet goes in a bit of cheese. Juniper will ask for breakfast at 6am — please don’t give in.</textarea>
+                  <p class="help">Your address and access instructions are shared only after Tom accepts.</p>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+
+          <aside class="lg:sticky lg:top-8 lg:self-start" aria-labelledby="sum-h">
+            <div class="rounded-2xl border border-line bg-white p-6">
+              <h2 id="sum-h" class="text-2xl font-semibold">Proposed terms</h2>
+              <p class="help !mt-1">Separate lines, agreed before anything is confirmed.</p>
+              <dl class="mt-5 space-y-3">
+                <div class="leader"><dt>Sitter rate · 4 nights × £45</dt><dd>£180.00</dd></div>
+                <div class="leader"><dt>Medication service</dt><dd>£10.00</dd></div>
+                <div class="leader"><dt>Travel (standard class, up to)</dt><dd>£38.00</dd></div>
+                <div class="leader"><dt>Incidentals (none agreed)</dt><dd>£0.00</dd></div>
+              </dl>
+              <div class="mt-5 rule pt-4">
+                <p class="flex items-baseline justify-between"><span class="font-semibold">Agreed to record</span><span class="font-display text-3xl font-semibold text-evergreen">£228.00</span></p>
+                <p class="help">Nesse records these terms only. Payment happens between you and Tom, outside Nesse.</p>
+              </div>
+              <button type="submit" data-mock="Send request" class="btn btn-primary mt-6 w-full">Send request to Tom<svg class="ico"><use href="#i-arrow"/></svg></button>
+              <p class="mt-3 text-center text-[15px] text-muted">Tom will get an in-app and email notification.</p>
+            </div>
+          </aside>
+        </form>
+      </section>
+
+      <!-- ============ REVIEW ============ -->
+      <section data-screen="review" aria-labelledby="rev-h" hidden>
+        <p class="eyebrow">Sitter view · Tom Reyes</p>
+        <h1 id="rev-h" class="mt-1 text-4xl font-semibold leading-tight sm:text-5xl">Requests</h1>
+        <p class="mt-3 max-w-prose text-lg text-muted">Accepting or declining is always your choice. Nothing changes until you decide.</p>
+
+        <div class="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <article aria-labelledby="rq-h">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="chip bg-warn-tint text-warn"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg>Requested · waiting for you</span>
+              <span class="text-[16px] text-muted">Received Mon 5 Oct, 20:05</span>
+            </div>
+            <h2 id="rq-h" class="mt-4 text-3xl font-semibold sm:text-4xl">Maya Okafor · Sat 14 – Wed 18 Nov</h2>
+
+            <div class="mt-6 flex items-start gap-3 rounded-lg bg-evergreen-50 p-4 text-[16px] text-evergreen">
+              <svg class="ico mt-0.5"><use href="#i-check"/></svg>
+              <p><strong>No clashes.</strong> These dates don’t overlap your blocks or another booking.</p>
+            </div>
+
+            <dl class="mt-8 grid gap-6 sm:grid-cols-2">
+              <div class="rounded-xl border border-line bg-white p-5">
+                <dt class="eyebrow">Requested arrival</dt>
+                <dd class="mt-1 font-display text-3xl font-semibold text-evergreen">Sat 14 Nov<span class="block">10:00</span></dd>
+                <dd class="mt-1 text-[15px] text-muted">Requested — you confirm or propose exact time</dd>
+              </div>
+              <div class="rounded-xl border border-line bg-white p-5">
+                <dt class="eyebrow">Requested departure</dt>
+                <dd class="mt-1 font-display text-3xl font-semibold text-evergreen">Wed 18 Nov<span class="block">15:00</span></dd>
+                <dd class="mt-1 text-[15px] text-muted">Requested — you confirm or propose exact time</dd>
+              </div>
+            </dl>
+
+            <section class="mt-10" aria-labelledby="care-h">
+              <h3 id="care-h" class="text-2xl font-semibold">Care details</h3>
+              <ul class="mt-4 divide-y divide-line border-y border-line text-[17px]">
+                <li class="flex gap-3 py-3"><svg class="ico mt-1 text-evergreen"><use href="#i-paw"/></svg>Biscuit, beagle (11) and Juniper, tabby (4)</li>
+                <li class="flex gap-3 py-3"><svg class="ico mt-1 text-evergreen"><use href="#i-check"/></svg>Medication with meals requested</li>
+                <li class="flex gap-3 py-3"><svg class="ico mt-1 text-evergreen"><use href="#i-pen"/></svg><span>“Biscuit’s tablet goes in a bit of cheese. Juniper will ask for breakfast at 6am — please don’t give in.”</span></li>
+                <li class="flex gap-3 py-3 text-muted"><svg class="ico mt-1"><use href="#i-lock"/></svg>Address and access instructions are hidden until you accept.</li>
+              </ul>
+            </section>
+          </article>
+
+          <aside class="space-y-6 lg:sticky lg:top-8 lg:self-start" aria-label="Decision">
+            <div class="rounded-2xl border border-line bg-white p-6">
+              <h2 class="text-2xl font-semibold">Proposed terms</h2>
+              <dl class="mt-4 space-y-3">
+                <div class="leader"><dt>Your rate · 4 × £45</dt><dd>£180.00</dd></div>
+                <div class="leader"><dt>Medication service</dt><dd>£10.00</dd></div>
+                <div class="leader"><dt>Travel, standard class (up to)</dt><dd>£38.00</dd></div>
+                <div class="leader"><dt>Incidentals</dt><dd>None</dd></div>
+              </dl>
+              <p class="mt-4 rule pt-3 text-[15px] text-muted">Recorded only. First-class travel isn’t reimbursable.</p>
+            </div>
+
+            <div class="rounded-2xl bg-pale p-6">
+              <h2 class="text-xl font-semibold">Your response</h2>
+              <p class="mt-1 text-[16px]">Maya is notified in-app and by email.</p>
+              <div class="mt-4 flex flex-col gap-3">
+                <button type="button" data-mock="Accept request" class="btn btn-primary w-full"><svg class="ico"><use href="#i-check"/></svg>Accept and propose times</button>
+                <button type="button" data-mock="Decline request" class="btn btn-outline w-full"><svg class="ico"><use href="#i-x"/></svg>Decline</button>
+              </div>
+              <p class="mt-3 text-[15px]">Not ready? Leave it. The request simply stays pending.</p>
+            </div>
+            <a href="#booking" class="btn-quiet inline-flex items-center gap-1">See the booking after acceptance<svg class="ico !h-4 !w-4"><use href="#i-arrow"/></svg></a>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ BOOKING ============ -->
+      <section data-screen="booking" aria-labelledby="bk-h" hidden>
+        <p class="eyebrow">Booker view · Maya Okafor</p>
+        <div class="mt-1 flex flex-wrap items-start justify-between gap-4">
+          <h1 id="bk-h" class="text-4xl font-semibold leading-tight sm:text-5xl">Biscuit &amp; Juniper’s stay</h1>
+          <span class="chip bg-coral-tint text-coral-deep !text-base"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg>Accepted · time details pending</span>
+        </div>
+        <p class="mt-2 text-lg text-muted">Sat 14 – Wed 18 Nov 2026 · with Tom Reyes · Booking record #NS-0142</p>
+
+        <ol class="mt-8 grid max-w-3xl grid-cols-4 gap-2 text-center text-sm font-semibold" aria-label="Booking progress">
+          <li class="border-t-4 border-evergreen pt-2 text-evergreen"><span class="flex items-center justify-center gap-1"><svg class="ico !h-4 !w-4"><use href="#i-check"/></svg>Requested</span></li>
+          <li class="border-t-4 border-evergreen pt-2 text-evergreen" aria-current="step"><span class="flex items-center justify-center gap-1"><svg class="ico !h-4 !w-4"><use href="#i-check"/></svg>Accepted</span></li>
+          <li class="border-t-4 border-dashed border-coral-deep pt-2 text-coral-deep"><span class="flex items-center justify-center gap-1"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg>Times</span></li>
+          <li class="border-t-4 border-line pt-2 text-muted">Confirmed</li>
+        </ol>
+
+        <div class="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div class="space-y-12">
+            <!-- Handover -->
+            <section aria-labelledby="ho-h">
+              <h2 id="ho-h" class="text-2xl font-semibold">Handover times</h2>
+              <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-xl border border-ok/40 bg-white p-5">
+                  <p class="chip bg-ok-tint text-ok"><svg class="ico !h-4 !w-4"><use href="#i-check"/></svg>Agreed</p>
+                  <p class="eyebrow mt-3">Arrival</p>
+                  <p class="font-display text-3xl font-semibold text-evergreen">Sat 14 Nov<span class="block">10:00</span></p>
+                  <p class="mt-1 text-[15px] text-muted">Agreed by both of you on 1 Nov. UK time.</p>
+                </div>
+                <div class="rounded-xl border-2 border-dashed border-coral-deep bg-coral-tint/50 p-5">
+                  <p class="chip bg-warn-tint text-warn"><svg class="ico !h-4 !w-4"><use href="#i-clock"/></svg>Needs your reply</p>
+                  <p class="eyebrow mt-3">Departure</p>
+                  <p class="font-display text-3xl font-semibold text-evergreen">Wed 18 Nov<span class="block">16:00</span></p>
+                  <p class="mt-1 text-[15px] text-ink/80">Tom proposed this. You asked for 15:00.</p>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <button type="button" data-mock="Agree departure time" class="btn btn-primary !min-h-[44px]">Agree 16:00</button>
+                    <button type="button" data-mock="Suggest another time" class="btn btn-outline !min-h-[44px]">Suggest another</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Costs -->
+            <section aria-labelledby="cost-h">
+              <h2 id="cost-h" class="text-2xl font-semibold">Agreed costs</h2>
+              <p class="help !mt-1">Each type is listed separately. Nesse records terms — it doesn’t take or send money.</p>
+              <div class="mt-4 rounded-2xl border border-line bg-white p-6">
+                <dl class="space-y-3">
+                  <div class="leader"><dt>Sitter rate · 4 nights × £45</dt><dd>£180.00</dd></div>
+                  <div class="leader"><dt>Optional: medication with meals</dt><dd>£10.00</dd></div>
+                  <div class="leader"><dt>Travel reimbursement (standard class, up to)</dt><dd>£38.00</dd></div>
+                  <div class="leader"><dt>Incidentals: snacks &amp; drinks, agreed in advance</dt><dd>£15.00</dd></div>
+                </dl>
+                <p class="mt-5 flex items-baseline justify-between rule pt-4"><span class="font-semibold">Total terms recorded</span><span class="font-display text-3xl font-semibold text-evergreen">£243.00</span></p>
+                <p class="mt-3 flex items-start gap-2 text-[15px] text-muted"><svg class="ico mt-0.5 !h-4 !w-4"><use href="#i-info"/></svg>First-class travel isn’t reimbursable. Travel is a cap until a receipt sets the final amount.</p>
+              </div>
+            </section>
+
+            <!-- Updates -->
+            <section aria-labelledby="up-h">
+              <h2 id="up-h" class="text-2xl font-semibold">Updates from Tom</h2>
+              <div class="mt-4 rounded-xl border border-dashed border-evergreen/40 bg-white p-6 text-center">
+                <svg class="ico mx-auto h-7 w-7 text-evergreen"><use href="#i-paw"/></svg>
+                <p class="mt-2 font-semibold">No updates yet</p>
+                <p class="mx-auto mt-1 max-w-sm text-[16px] text-muted">Once the stay starts, Tom can optionally share short, dated notes. They’re friendly check-ins, not proof of attendance.</p>
+              </div>
+            </section>
+
+            <!-- Attachments -->
+            <section aria-labelledby="att-h">
+              <h2 id="att-h" class="text-2xl font-semibold">Files</h2>
+              <ul class="mt-4 divide-y divide-line border-y border-line">
+                <li class="flex items-start gap-4 py-4">
+                  <span class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-pale text-evergreen"><svg class="ico"><use href="#i-receipt"/></svg></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="font-semibold break-words">train-ticket-receipt.pdf</p>
+                    <p class="text-[15px] text-muted">Added by Tom Reyes · Mon 12 Oct, 14:22 · 182 KB</p>
+                    <p class="mt-1.5 chip bg-pale text-ink !text-[13px]">Expense evidence — not proof of attendance</p>
+                  </div>
+                </li>
+              </ul>
+              <button type="button" data-mock="Add file" class="btn btn-outline mt-4"><svg class="ico"><use href="#i-clip"/></svg>Add a file</button>
+              <p class="help">PDF, JPG or PNG · up to 10 MB each.</p>
+            </section>
+
+            <!-- History -->
+            <section aria-labelledby="hist-h">
+              <h2 id="hist-h" class="text-2xl font-semibold">History</h2>
+              <ol class="mt-5 space-y-6 border-l-2 border-line pl-6">
+                <li class="relative"><span class="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-coral-deep bg-paper"></span><p class="eyebrow !text-xs">Today · 09:12</p><p class="font-semibold">Tom proposed a departure time of 16:00</p><p class="text-[16px] text-muted">Replaces your requested 15:00 once you agree.</p></li>
+                <li class="relative"><span class="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-evergreen"></span><p class="eyebrow !text-xs">Sun 11 Oct · 18:40</p><p class="font-semibold">Arrival time agreed: Sat 14 Nov, 10:00</p></li>
+                <li class="relative"><span class="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-evergreen"></span><p class="eyebrow !text-xs">Sun 11 Oct · 18:38</p><p class="font-semibold">Tom accepted the request</p></li>
+                <li class="relative"><span class="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-evergreen"></span><p class="eyebrow !text-xs">Mon 5 Oct · 20:05</p><p class="font-semibold">Maya requested 14–18 Nov</p></li>
+              </ol>
+            </section>
+          </div>
+
+          <aside class="space-y-8 lg:sticky lg:top-8 lg:self-start" aria-label="People and safety">
+            <section class="rounded-2xl bg-pale p-6" aria-labelledby="ct-h">
+              <h2 id="ct-h" class="text-2xl font-semibold">Contacts</h2>
+              <ul class="mt-4 space-y-4">
+                <li class="flex items-start gap-3"><svg class="ico mt-1"><use href="#i-phone"/></svg><div><p class="font-semibold">Tom Reyes · sitter</p><p class="text-[16px]">07700 900 142</p></div></li>
+                <li class="flex items-start gap-3"><svg class="ico mt-1"><use href="#i-phone"/></svg><div><p class="font-semibold">Dan Okafor · Maya’s emergency contact</p><p class="text-[16px]">07700 900 377</p></div></li>
+                <li class="flex items-start gap-3"><svg class="ico mt-1"><use href="#i-paw"/></svg><div><p class="font-semibold">Vet: Elm Road Veterinary</p><p class="text-[16px]">01632 960 018</p></div></li>
+              </ul>
+              <p class="mt-5 text-[15px]">Nesse isn’t an emergency service. In an emergency, call the relevant emergency number first.</p>
+            </section>
+
+            <section aria-labelledby="inst-h">
+              <h2 id="inst-h" class="text-2xl font-semibold">Home &amp; pet instructions</h2>
+              <ul class="mt-4 divide-y divide-line border-y border-line text-[17px]">
+                <li class="py-3"><p class="font-semibold">Biscuit</p><p class="text-[16px] text-muted">Tablet with breakfast, in cheese. Walks at 7:30 and 5.</p></li>
+                <li class="py-3"><p class="font-semibold">Juniper</p><p class="text-[16px] text-muted">Wet food twice daily. Keep the back door closed.</p></li>
+                <li class="flex items-start gap-3 py-3 text-muted"><svg class="ico mt-1"><use href="#i-lock"/></svg><span>Address and key-safe code are shared with Tom only, at confirmation.</span></li>
+              </ul>
+            </section>
+
+            <section class="rounded-2xl border border-line bg-white p-6" aria-labelledby="canc-h">
+              <h2 id="canc-h" class="text-xl font-semibold">Cancellation terms</h2>
+              <p class="mt-2 text-[16px]">If Tom cancels within 72 hours of the agreed start (Sat 14 Nov, 10:00), he may be responsible for agreed alternative-care costs.</p>
+              <p class="mt-3 flex items-center gap-2 text-[16px] font-semibold text-ok"><svg class="ico"><use href="#i-check"/></svg>Acknowledged by both on 11 Oct</p>
+              <p class="mt-3 text-[14px] text-muted">Nesse records these terms. It doesn’t decide liability or collect any costs.</p>
+              <div class="mt-5 rule pt-5">
+                <button type="button" data-mock="Cancel booking" class="btn btn-danger w-full"><svg class="ico"><use href="#i-ban"/></svg>Cancel this booking</button>
+                <p class="help text-center">You’ll be asked to confirm. Unanswered messages never cancel a booking.</p>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile bottom nav -->
+    <nav aria-label="Prototype screens" class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <ul class="mx-auto flex max-w-xl">
+        <li class="flex-1"><a class="tab-link" href="#home" data-nav="home"><svg class="ico"><use href="#i-home"/></svg>Home</a></li>
+        <li class="flex-1"><a class="tab-link" href="#request" data-nav="request"><svg class="ico"><use href="#i-pen"/></svg>Request</a></li>
+        <li class="flex-1"><a class="tab-link" href="#booking" data-nav="booking"><svg class="ico"><use href="#i-book"/></svg>Booking</a></li>
+        <li class="flex-1"><a class="tab-link" href="#availability" data-nav="availability"><svg class="ico"><use href="#i-calendar"/></svg>Calendar</a></li>
+        <li class="flex-1"><a class="tab-link" href="#review" data-nav="review"><svg class="ico"><use href="#i-inbox"/></svg>Inbox</a></li>
+      </ul>
+    </nav>
+  </div>
+</div>
+
+<!-- Prototype-only feedback -->
+<div id="toast" role="status" aria-live="polite" class="pointer-events-none fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-md translate-y-2 items-center gap-3 rounded-xl bg-ink px-5 py-3.5 text-white opacity-0 shadow-lg transition duration-200 lg:bottom-8">
+  <svg class="ico shrink-0"><use href="#i-info"/></svg><p id="toast-text" class="text-[16px]"></p>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
