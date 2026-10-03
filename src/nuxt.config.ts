@@ -10,5 +10,8 @@ export default defineNuxtConfig({
       title: 'Nesse',
     },
   },
+  nitro: {
+    serverAssets: [{ baseName: 'migrations', dir: './db/migrations' }],
+  },
   typescript: { strict: true },
 })

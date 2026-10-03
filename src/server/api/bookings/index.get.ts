@@ -1,2 +1,4 @@
-export default defineEventHandler((): Booking[] =>
-  [...bookings.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+export default defineApiHandler(async (): Promise<Booking[]> => {
+  const { bookings, actors } = await useServices()
+  return bookings.list(actors.bookerId())
+})

@@ -1,3 +1,7 @@
+import type { z } from 'zod'
+import type { bookingRequestSchema, cancelBookingSchema } from '../schemas/booking'
+import type { agreeTimesSchema, availabilityBlockInputSchema, declineBookingSchema } from '../schemas/sitter'
+
 /** Money is always an integer in minor units (pence). */
 export type Money = number
 
@@ -10,6 +14,8 @@ export type BookingStatus =
   | 'completed'
 
 export type RateBasis = 'per_night' | 'per_day'
+
+export type ActorRole = 'booker' | 'sitter'
 
 export interface OptionalService {
   id: string
@@ -39,44 +45,24 @@ export interface AvailabilityDay {
   status: DayStatus
 }
 
-export interface Pet {
-  name: string
-  species: string
-  notes: string
-}
-
-export interface IncidentalExpense {
-  description: string
-  amount: Money
-}
-
-export interface EmergencyContact {
-  name: string
-  phone: string
-  relationship: string
-}
-
-export interface BookingRequest {
-  sitterId: string
-  /** yyyy-mm-dd, arrival day */
+export interface AvailabilityBlock {
+  id: string
+  /** yyyy-mm-dd, inclusive */
   startDate: string
-  /** yyyy-mm-dd, departure day */
+  /** yyyy-mm-dd, inclusive */
   endDate: string
-  /** HH:mm, requested (not agreed) local time at the property */
-  arrivalTime: string
-  departureTime: string
-  pets: Pet[]
-  careNotes: string
-  propertyInstructions: string
-  optionalServiceIds: string[]
-  travelReimbursement: { amount: Money, notes: string }
-  incidentalExpenses: IncidentalExpense[]
-  emergencyContact: EmergencyContact
-  vet: { name: string, phone: string }
-  emergencyInstructions: string
-  /** FR-25: booker has acknowledged the 72-hour cancellation term */
-  cancellationTermAcknowledged: boolean
+  reason: string
 }
+
+export type AvailabilityBlockInput = z.infer<typeof availabilityBlockInputSchema>
+
+export type BookingRequest = z.infer<typeof bookingRequestSchema>
+export type Pet = BookingRequest['pets'][number]
+export type IncidentalExpense = BookingRequest['incidentalExpenses'][number]
+export type EmergencyContact = BookingRequest['emergencyContact']
+export type CancelBookingRequest = z.infer<typeof cancelBookingSchema>
+export type DeclineBookingRequest = z.infer<typeof declineBookingSchema>
+export type AgreeTimesRequest = z.infer<typeof agreeTimesSchema>
 
 export type HistoryEventType =
   | 'requested'
@@ -93,8 +79,17 @@ export interface BookingHistoryEntry {
   /** ISO 8601 instant */
   at: string
   type: HistoryEventType
-  actor: 'booker' | 'sitter'
+  actor: ActorRole
   message: string
+}
+
+export interface BookingPricing {
+  nights: number
+  sitting: Money
+  services: Money
+  travel: Money
+  incidentals: Money
+  total: Money
 }
 
 export interface Booking extends BookingRequest {
@@ -105,9 +100,23 @@ export interface Booking extends BookingRequest {
   sitterName: string
   rate: Money
   rateBasis: RateBasis
+  /** Services as priced when the request was made. */
+  services: OptionalService[]
+  /** HH:mm, set once the sitter has confirmed exact handover times. */
+  agreedArrivalTime: string | null
+  agreedDepartureTime: string | null
+  pricing: BookingPricing
   history: BookingHistoryEntry[]
 }
 
-export interface CancelBookingRequest {
-  reason?: string
+export type ApiErrorCode =
+  | 'validation_failed'
+  | 'not_found'
+  | 'conflict'
+  | 'invalid_transition'
+  | 'internal_error'
+
+export interface ApiErrorData {
+  code: ApiErrorCode
+  fieldErrors?: Record<string, string[]>
 }

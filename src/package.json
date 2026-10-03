@@ -8,7 +8,15 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "db:migrate": "node scripts/db/index.ts migrate",
+    "db:status": "node scripts/db/index.ts status",
+    "db:backup": "node scripts/db/index.ts backup",
+    "db:list-backups": "node scripts/db/index.ts list",
+    "db:verify-backup": "node scripts/db/index.ts verify",
+    "db:restore": "node scripts/db/index.ts restore",
+    "db:seed": "node scripts/db/index.ts seed"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.139",
@@ -17,12 +25,18 @@
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3",
     "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "vue-router": "^5.3.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@pinia/nuxt": "^1.0.2",
+    "@types/node": "^24.19.1",
     "pinia": "^4.0.3",
     "typescript": "~5.9",
+    "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

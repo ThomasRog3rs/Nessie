@@ -1,5 +1,7 @@
-export default defineEventHandler((event): Booking => {
-  const booking = bookings.get(getRouterParam(event, 'id') ?? '')
-  if (!booking) throw createError({ statusCode: 404, statusMessage: 'Booking not found' })
-  return booking
+import { bookingIdSchema } from '../../../../shared/schemas/booking'
+
+export default defineApiHandler(async (event): Promise<Booking> => {
+  const id = parseParam(event, 'id', bookingIdSchema)
+  const { bookings, actors } = await useServices()
+  return bookings.get(actors.bookerId(), id)
 })
