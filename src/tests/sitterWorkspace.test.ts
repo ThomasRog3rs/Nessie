@@ -192,6 +192,17 @@ describe('sitter profile and booking workspace', () => {
       'attachment-receipt',
       photo.id,
     ]))
+    const bookerView = context.services.bookings.get(context.bookerId, booking.id)
+    expect(bookerView.attachments).toContainEqual(expect.objectContaining({
+      id: photo.id,
+      kind: 'photo',
+      fileName: 'pet.png',
+      caption: 'On the sofa',
+    }))
+    expect(context.services.bookings.getAttachment(context.bookerId, booking.id, photo.id).storageKey)
+      .toBe('00000000-0000-4000-8000-000000000002')
+    expect(() => context.services.bookings.getAttachment('someone-else', booking.id, photo.id)).toThrow(NotFoundError)
+    expect(() => context.services.bookings.getAttachment(context.bookerId, booking.id, 'missing')).toThrow(NotFoundError)
     expect(() => sitterBookings.getAttachment(context.sitterId, '00000000-0000-4000-8000-000000000000', photo.id))
       .toThrow(NotFoundError)
     expect(() => sitterBookings.addAttachment(context.sitterId, booking.id, {

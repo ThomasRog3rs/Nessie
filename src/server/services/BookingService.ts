@@ -32,7 +32,11 @@ export class BookingService {
 
   get(bookerId: string, bookingId: string): BookerBooking {
     const booking = this.require(bookerId, bookingId)
-    return { ...booking, sitterExpenses: this.deps.queries.listSitterExpenses(booking.id) }
+    return {
+      ...booking,
+      sitterExpenses: this.deps.queries.listSitterExpenses(booking.id),
+      attachments: this.deps.queries.listAttachments(booking.id),
+    }
   }
 
   getReceipt(bookerId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
@@ -40,6 +44,14 @@ export class BookingService {
     const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
     const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
     if (!attachment || attachment.kind !== 'receipt' || !storageKey) throw new NotFoundError('Receipt not found')
+    return { attachment, storageKey }
+  }
+
+  getAttachment(bookerId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
+    this.require(bookerId, bookingId)
+    const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
+    const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+    if (!attachment || !storageKey) throw new NotFoundError('Attachment not found')
     return { attachment, storageKey }
   }
 

@@ -27,6 +27,21 @@ const costRows = computed(() => {
 const showActual = computed(() => !!booking.value && ['confirmed', 'completed'].includes(booking.value.status))
 const actual = computed(() => booking.value ? calculateActualCosts(booking.value.pricing, booking.value.sitterExpenses) : undefined)
 const receiptUrl = (receiptId: string) => `/api/bookings/${id}/receipts/${receiptId}`
+const attachmentUrl = (attachmentId: string) => `/api/bookings/${id}/attachments/${attachmentId}`
+const timeline = computed(() => {
+  const current = booking.value
+  return current
+    ? [...current.history].reverse().map(event => ({
+      ...event,
+      attachments: current.attachments.filter((attachment) => {
+        const expectedKind = event.type === 'photo_added' ? 'photo' : event.type === 'receipt_added' ? 'receipt' : undefined
+        return expectedKind === attachment.kind
+          && event.at === attachment.createdAt
+          && event.message.includes(attachment.fileName)
+      }),
+    }))
+    : []
+})
 
 const cancelOpen = ref(false)
 const reason = ref('')
@@ -159,10 +174,38 @@ async function cancel() {
       <section aria-labelledby="history-h" class="mt-10">
         <h2 id="history-h" class="text-xl font-semibold">History</h2>
         <ol class="mt-4 space-y-4 border-l-2 border-default pl-5">
-          <li v-for="h in [...booking.history].reverse()" :key="h.id" class="relative">
+          <li v-for="h in timeline" :key="h.id" class="relative">
             <span class="absolute -left-[1.6rem] top-2 size-3 rounded-full bg-primary" aria-hidden="true" />
             <p class="text-sm text-muted"><time :datetime="h.at">{{ formatInstant(h.at, booking.timezone) }}</time> · {{ h.actor === 'booker' ? 'You' : booking.sitterName }}</p>
             <p>{{ h.message }}</p>
+            <ul v-if="h.attachments.length" class="mt-3 flex flex-wrap gap-3">
+              <li v-for="attachment in h.attachments" :key="attachment.id" class="max-w-48">
+                <a
+                  v-if="attachment.mimeType.startsWith('image/')"
+                  :href="attachmentUrl(attachment.id)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block overflow-hidden rounded-lg border border-default"
+                >
+                  <img
+                    :src="attachmentUrl(attachment.id)"
+                    :alt="attachment.caption || attachment.fileName"
+                    class="aspect-square w-full object-cover"
+                    loading="lazy"
+                  >
+                </a>
+                <p v-if="attachment.caption" class="mt-1 text-sm text-toned">{{ attachment.caption }}</p>
+                <a
+                  :href="attachmentUrl(attachment.id)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="mt-1 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                >
+                  {{ attachment.kind === 'receipt' ? 'View receipt' : attachment.fileName }}
+                  <UIcon name="i-lucide-external-link" class="size-4" aria-hidden="true" />
+                </a>
+              </li>
+            </ul>
           </li>
         </ol>
       </section>
