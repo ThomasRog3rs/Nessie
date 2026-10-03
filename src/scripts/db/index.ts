@@ -9,7 +9,7 @@ import { openDatabase } from '../../server/db/connection.ts'
 import { openAndMigrate } from '../../server/db/bootstrap.ts'
 import { FileMigrationSource, Migrator } from '../../server/db/migrator.ts'
 import { restoreBackup } from '../../server/db/restore.ts'
-import { clearData, isSeeded, seedDatabase } from '../../server/db/seed.ts'
+import { clearData, isSeeded, seedCleanDatabase, seedDatabase } from '../../server/db/seed.ts'
 import { todayInTimeZone } from '../../shared/utils/dateRange.ts'
 
 const config = readDatabaseConfig()
@@ -17,7 +17,7 @@ const source = new FileMigrationSource(resolve(dirname(fileURLToPath(import.meta
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
-  options: { force: { type: 'boolean', default: false }, reset: { type: 'boolean', default: false } },
+  options: { force: { type: 'boolean', default: false }, reset: { type: 'boolean', default: false }, clean: { type: 'boolean', default: false } },
 })
 const [command, argument] = positionals
 
@@ -81,8 +81,14 @@ const commands: Record<string, () => Promise<void> | void> = {
         if (!values.reset) throw new Error('Database already has data. Pass --reset to replace it (take a backup first).')
         clearData(db)
       }
-      seedDatabase(db, todayInTimeZone('Europe/London'))
-      console.log('Seeded sitter Thomas Rogers, a demo booker, blocked dates and sample bookings.')
+      if (values.clean) {
+        seedCleanDatabase(db)
+        console.log('Seeded a bare sitter (Thomas Rogers, name only) and a demo booker with no bookings.')
+      }
+      else {
+        seedDatabase(db, todayInTimeZone('Europe/London'))
+        console.log('Seeded sitter Thomas Rogers, a demo booker, blocked dates and sample bookings.')
+      }
     }
     finally {
       db.close()
@@ -92,7 +98,7 @@ const commands: Record<string, () => Promise<void> | void> = {
 
 const run = command ? commands[command] : undefined
 if (!run) {
-  console.error(`Usage: db <${Object.keys(commands).join('|')}> [argument] [--force] [--reset]`)
+  console.error(`Usage: db <${Object.keys(commands).join('|')}> [argument] [--force] [--reset] [--clean]`)
   process.exit(1)
 }
 try {

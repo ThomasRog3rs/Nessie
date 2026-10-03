@@ -134,6 +134,20 @@ export function seedDatabase(db: Database, today: string): void {
   })
 }
 
+/** Manual end-to-end baseline: a bare sitter (name only), a booker with no bookings, no blocked dates. */
+export function seedCleanDatabase(db: Database): void {
+  const now = new Date().toISOString()
+  inTransaction(db, () => {
+    db.prepare('INSERT INTO bookers (id, name, email, created_at) VALUES (?, ?, ?, ?)')
+      .run(SEED_BOOKER_ID, 'Demo Booker', 'booker@nesse.test', now)
+    db.prepare(`INSERT INTO sitters (id, name, email, bio, location, contact_phone, rate_pence, rate_basis, currency, timezone, created_at)
+      VALUES (?, ?, ?, '', '', '', 0, 'per_night', 'GBP', 'Europe/London', ?)`)
+      .run(SEED_SITTER_ID, 'Thomas Rogers', 'thomas@nesse.test', now)
+    db.prepare('INSERT INTO booker_sitter_links (booker_id, sitter_id, created_at) VALUES (?, ?, ?)')
+      .run(SEED_BOOKER_ID, SEED_SITTER_ID, now)
+  })
+}
+
 function insertBooking(db: Database, booking: SeedBooking, today: string, now: string): void {
   const id = randomUUID()
   const [agreedArrival, agreedDeparture] = booking.agreedTimes ?? [null, null]

@@ -113,3 +113,5 @@ Run a restore drill periodically against a scratch path: `NESSIE_DB_PATH=/tmp/dr
 ### Other commands
 
 `npm run db:seed` seeds an empty DB (`-- --reset` replaces existing data; back up first).
+
+`npm run db:seed:clean` resets the DB to a manual-testing baseline: Thomas Rogers with only a name (no bio, pets, services, rate or blocked dates) and a demo booker with no bookings. Back up first.

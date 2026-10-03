@@ -16,7 +16,8 @@
     "db:list-backups": "node scripts/db/index.ts list",
     "db:verify-backup": "node scripts/db/index.ts verify",
     "db:restore": "node scripts/db/index.ts restore",
-    "db:seed": "node scripts/db/index.ts seed"
+    "db:seed": "node scripts/db/index.ts seed",
+    "db:seed:clean": "node scripts/db/index.ts seed --reset --clean"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.139",
