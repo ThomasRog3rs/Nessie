@@ -1,5 +1,5 @@
-import { bookingIdSchema } from '../../../../../../../shared/schemas/booking.ts'
-import { PrivateFileStorage } from '../../../../../../storage/PrivateFileStorage.ts'
+import { bookingIdSchema } from '../../../../../shared/schemas/booking.ts'
+import { PrivateFileStorage } from '../../../../storage/PrivateFileStorage.ts'
 
 export default defineApiHandler(async (event) => {
   const bookingId = parseParam(event, 'id', bookingIdSchema)

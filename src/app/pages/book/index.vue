@@ -10,7 +10,7 @@ const draft = useBookingDraftStore()
 const { data: sitter, error: sitterError, refresh: refreshSitter } = await useAsyncData('sitter', () => api.getSitter())
 
 const todayDate = today(sitter.value?.timezone ?? 'Europe/London')
-const windowEnd = todayDate.add({ months: 18 })
+const windowEnd = todayDate.add({ months: 12 })
 
 const { data: availability, status: availabilityStatus, error: availabilityError, refresh: refreshAvailability } = await useAsyncData(
   'availability',
