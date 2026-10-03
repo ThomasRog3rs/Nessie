@@ -2,7 +2,13 @@ import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export class PrivateFileStorage {
+export interface PrivateStorage {
+  put(contents: Buffer): Promise<string>
+  get(key: string): Promise<Buffer>
+  remove(key: string): Promise<void>
+}
+
+export class PrivateFileStorage implements PrivateStorage {
   private readonly directory: string
 
   constructor(directory = process.env.NESSIE_PRIVATE_UPLOAD_DIR ?? '.data/private-uploads') {

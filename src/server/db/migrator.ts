@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { inTransaction } from './connection.ts'
+import { getAll, getRow, runStatement } from './connection.ts'
 import type { Database } from './connection.ts'
 
 export interface Migration {
@@ -57,15 +57,21 @@ export class FileMigrationSource implements MigrationSource {
   }
 }
 
-export function readAppliedMigrations(db: Database): AppliedMigration[] {
-  const table = db.prepare('SELECT 1 AS found FROM sqlite_master WHERE type = \'table\' AND name = \'schema_migrations\'').get()
+export async function readAppliedMigrations(db: Database): Promise<AppliedMigration[]> {
+  const table = await getRow<{ found: number }>(
+    db,
+    'SELECT 1 AS found FROM sqlite_master WHERE type = ? AND name = ?',
+    ['table', 'schema_migrations'],
+  )
   if (!table) return []
-  return db.prepare('SELECT version, name, checksum, applied_at AS appliedAt FROM schema_migrations ORDER BY version')
-    .all() as unknown as AppliedMigration[]
+  return getAll<AppliedMigration>(
+    db,
+    'SELECT version, name, checksum, applied_at AS appliedAt FROM schema_migrations ORDER BY version',
+  )
 }
 
-export function currentSchemaVersion(db: Database): number {
-  return readAppliedMigrations(db).at(-1)?.version ?? 0
+export async function currentSchemaVersion(db: Database): Promise<number> {
+  return (await readAppliedMigrations(db)).at(-1)?.version ?? 0
 }
 
 export class Migrator {
@@ -79,7 +85,7 @@ export class Migrator {
 
   async status(): Promise<MigrationStatus> {
     const available = this.assertContiguous(await this.source.load())
-    const applied = readAppliedMigrations(this.db)
+    const applied = await readAppliedMigrations(this.db)
     this.assertHistoryMatches(applied, available)
     return {
       applied,
@@ -88,16 +94,21 @@ export class Migrator {
     }
   }
 
-  /** Applies every pending migration, each in its own transaction. */
+  /** Applies every pending migration, each in its own write transaction. */
   async migrate(): Promise<Migration[]> {
     const { pending } = await this.status()
-    if (pending.length > 0) this.ensureTable()
-    for (const migration of pending) this.apply(migration)
-    return pending
+    if (pending.length === 0) return []
+
+    await this.ensureTable()
+    const applied: Migration[] = []
+    for (const migration of pending) {
+      if (await this.apply(migration)) applied.push(migration)
+    }
+    return applied
   }
 
-  private ensureTable(): void {
-    this.db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+  private async ensureTable(): Promise<void> {
+    await this.db.executeMultiple(`CREATE TABLE IF NOT EXISTS schema_migrations (
       version    INTEGER PRIMARY KEY,
       name       TEXT NOT NULL,
       checksum   TEXT NOT NULL,
@@ -105,11 +116,28 @@ export class Migrator {
     ) STRICT`)
   }
 
-  private apply(migration: Migration): void {
-    inTransaction(this.db, () => {
-      this.db.exec(migration.sql)
-      this.db.prepare('INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)')
-        .run(migration.version, migration.name, checksum(migration.sql), new Date().toISOString())
+  private async apply(migration: Migration): Promise<boolean> {
+    return this.db.runInTransaction('write', async () => {
+      await this.ensureTable()
+      const existing = await getRow<AppliedMigration>(
+        this.db,
+        'SELECT version, name, checksum, applied_at AS appliedAt FROM schema_migrations WHERE version = ?',
+        [migration.version],
+      )
+      if (existing) {
+        if (existing.name !== migration.name || existing.checksum !== checksum(migration.sql)) {
+          throw new MigrationError(`Migration ${migration.version}_${migration.name} was modified after being applied. Never edit applied migrations; add a new one.`)
+        }
+        return false
+      }
+
+      await this.db.executeMultiple(migration.sql)
+      await runStatement(
+        this.db,
+        'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+        [migration.version, migration.name, checksum(migration.sql), new Date().toISOString()],
+      )
+      return true
     })
   }
 

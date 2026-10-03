@@ -1,3 +1,4 @@
+import { createBackupStore } from '../db/backupStoreFactory.ts'
 import { NitroMigrationSource } from './migrationAssets.ts'
 import { readDatabaseConfig } from '../db/config.ts'
 import type { Database } from '../db/connection.ts'
@@ -16,13 +17,18 @@ let runtime: Promise<Runtime> | undefined
 
 async function start(): Promise<Runtime> {
   const config = readDatabaseConfig()
-  const { db, applied, preMigrationBackup } = await openAndMigrate({ ...config, source: new NitroMigrationSource() })
+  const backupStore = createBackupStore(config)
+  const { db, applied, preMigrationBackup } = await openAndMigrate({
+    ...config,
+    backupStore,
+    source: new NitroMigrationSource(),
+  })
   if (preMigrationBackup) console.info(`[db] pre-migration backup: ${preMigrationBackup.file}`)
   if (applied.length > 0) console.info(`[db] applied migrations: ${applied.map(m => m.version).join(', ')}`)
 
   const seedOnEmpty = process.env.NESSIE_SEED_ON_EMPTY ?? (import.meta.dev ? 'true' : 'false')
-  if (seedOnEmpty === 'true' && !isSeeded(db)) {
-    seedDatabase(db, todayInTimeZone('Europe/London'))
+  if (seedOnEmpty === 'true' && !await isSeeded(db)) {
+    await seedDatabase(db, todayInTimeZone('Europe/London'))
     console.info('[db] seeded demo data')
   }
   return { db, services: createServices(db) }

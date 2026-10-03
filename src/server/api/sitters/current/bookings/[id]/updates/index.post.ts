@@ -6,7 +6,7 @@ export default defineApiHandler(async (event) => {
   const id = parseParam(event, 'id', bookingIdSchema)
   const input = await parseBody(event, progressUpdateSchema)
   const { sitterBookings } = await useServices()
-  const update = sitterBookings.addProgressUpdate(sitterId, id, input)
+  const update = await sitterBookings.addProgressUpdate(sitterId, id, input)
   setResponseStatus(event, 201)
   return update
 })

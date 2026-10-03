@@ -26,49 +26,53 @@ export class BookingService {
     this.deps = deps
   }
 
-  list(bookerId: string): Booking[] {
+  list(bookerId: string): Promise<Booking[]> {
     return this.deps.queries.listForBooker(bookerId)
   }
 
-  get(bookerId: string, bookingId: string): BookerBooking {
-    const booking = this.require(bookerId, bookingId)
+  async get(bookerId: string, bookingId: string): Promise<BookerBooking> {
+    const booking = await this.require(bookerId, bookingId)
     return {
       ...booking,
-      sitterExpenses: this.deps.queries.listSitterExpenses(booking.id),
-      attachments: this.deps.queries.listAttachments(booking.id),
+      sitterExpenses: await this.deps.queries.listSitterExpenses(booking.id),
+      attachments: await this.deps.queries.listAttachments(booking.id),
     }
   }
 
-  getReceipt(bookerId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
-    this.require(bookerId, bookingId)
-    const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
-    const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+  async getReceipt(bookerId: string, bookingId: string, attachmentId: string): Promise<{ attachment: BookingAttachment, storageKey: string }> {
+    await this.require(bookerId, bookingId)
+    const [attachment, storageKey] = await Promise.all([
+      this.deps.queries.findAttachment(bookingId, attachmentId),
+      this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId),
+    ])
     if (!attachment || attachment.kind !== 'receipt' || !storageKey) throw new NotFoundError('Receipt not found')
     return { attachment, storageKey }
   }
 
-  getAttachment(bookerId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
-    this.require(bookerId, bookingId)
-    const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
-    const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+  async getAttachment(bookerId: string, bookingId: string, attachmentId: string): Promise<{ attachment: BookingAttachment, storageKey: string }> {
+    await this.require(bookerId, bookingId)
+    const [attachment, storageKey] = await Promise.all([
+      this.deps.queries.findAttachment(bookingId, attachmentId),
+      this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId),
+    ])
     if (!attachment || !storageKey) throw new NotFoundError('Attachment not found')
     return { attachment, storageKey }
   }
 
-  create(bookerId: string, request: BookingRequest): Booking {
+  async create(bookerId: string, request: BookingRequest): Promise<Booking> {
     const { sitters, availability, commands, transactions, clock, ids } = this.deps
-    const sitter = sitters.findPreferredForBooker(bookerId)
+    const sitter = await sitters.findPreferredForBooker(bookerId)
     if (!sitter || sitter.id !== request.sitterId) throw new NotFoundError('Unknown sitter')
 
     this.assertRequestable(sitter, request)
 
-    return transactions.run(() => {
-      const conflict = availability.findStayConflict(sitter.id, request.startDate, request.endDate)
+    return transactions.run(async () => {
+      const conflict = await availability.findStayConflict(sitter.id, request.startDate, request.endDate)
       if (conflict === 'blocked') throw new ConflictError('The sitter is not available on some of these dates')
       if (conflict === 'booked') throw new ConflictError('These dates overlap an existing booking')
 
       const createdAt = clock.now().toISOString()
-      const services = sitter.optionalServices.filter(s => request.optionalServiceIds.includes(s.id))
+      const services = sitter.optionalServices.filter(service => request.optionalServiceIds.includes(service.id))
       const booking: Booking = {
         ...request,
         id: ids.next(),
@@ -96,22 +100,22 @@ export class BookingService {
           message: `Requested ${request.startDate} to ${request.endDate}. Times are requested, not yet agreed.`,
         }],
       }
-      commands.insert({ booking, bookerId, sitterId: sitter.id })
+      await commands.insert({ booking, bookerId, sitterId: sitter.id })
       return booking
     })
   }
 
-  cancel(bookerId: string, bookingId: string, reason?: string): Booking {
-    return this.deps.transactions.run(() => {
-      const booking = this.require(bookerId, bookingId)
+  cancel(bookerId: string, bookingId: string, reason?: string): Promise<Booking> {
+    return this.deps.transactions.run(async () => {
+      const booking = await this.require(bookerId, bookingId)
       const trimmed = reason?.trim()
-      this.deps.lifecycle.apply(booking, 'cancel', 'booker', trimmed ? `Cancelled by the booker: ${trimmed}` : 'Cancelled by the booker.')
+      await this.deps.lifecycle.apply(booking, 'cancel', 'booker', trimmed ? `Cancelled by the booker: ${trimmed}` : 'Cancelled by the booker.')
       return this.require(bookerId, bookingId)
     })
   }
 
-  private require(bookerId: string, bookingId: string): Booking {
-    const booking = this.deps.queries.findForBooker(bookingId, bookerId)
+  private async require(bookerId: string, bookingId: string): Promise<Booking> {
+    const booking = await this.deps.queries.findForBooker(bookingId, bookerId)
     if (!booking) throw new NotFoundError('Booking not found')
     return booking
   }
@@ -127,7 +131,7 @@ export class BookingService {
     const unaccepted = request.pets.filter(pet => !accepted.has(pet.species.toLowerCase())).map(pet => pet.species)
     if (unaccepted.length > 0) fieldErrors.pets = [`${sitter.name} does not accept: ${[...new Set(unaccepted)].join(', ')}`]
 
-    const offered = new Set(sitter.optionalServices.map(s => s.id))
+    const offered = new Set(sitter.optionalServices.map(service => service.id))
     if (request.optionalServiceIds.some(id => !offered.has(id))) {
       fieldErrors.optionalServiceIds = ['One or more selected services are not offered']
     }

@@ -15,7 +15,7 @@ export function requireClerkUserId(event: H3Event): string {
 export async function requireSitterId(event: H3Event): Promise<string> {
   const userId = requireClerkUserId(event)
   const { accounts } = await useServices()
-  const sitterId = accounts.findSitterId(userId)
+  const sitterId = await accounts.findSitterId(userId)
   if (!sitterId) throw new ForbiddenError('This area is for the sitter')
   return sitterId
 }
@@ -23,7 +23,7 @@ export async function requireSitterId(event: H3Event): Promise<string> {
 export async function requireBookerId(event: H3Event): Promise<string> {
   const userId = requireClerkUserId(event)
   const { accounts } = await useServices()
-  const bookerId = accounts.findBookerId(userId)
+  const bookerId = await accounts.findBookerId(userId)
   if (!bookerId) throw new ForbiddenError('Join through a link from your sitter to book')
   return bookerId
 }

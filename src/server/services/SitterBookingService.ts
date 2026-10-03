@@ -26,36 +26,36 @@ export class SitterBookingService {
     this.deps = deps
   }
 
-  list(sitterId: string): SitterBooking[] {
-    return this.deps.queries.listForSitter(sitterId).map(booking => this.project(booking, sitterId))
+  async list(sitterId: string): Promise<SitterBooking[]> {
+    return Promise.all((await this.deps.queries.listForSitter(sitterId)).map(booking => this.project(booking, sitterId)))
   }
 
-  get(sitterId: string, bookingId: string): SitterBooking {
-    return this.project(this.require(sitterId, bookingId), sitterId)
+  async get(sitterId: string, bookingId: string): Promise<SitterBooking> {
+    return this.project(await this.require(sitterId, bookingId), sitterId)
   }
 
-  accept(sitterId: string, bookingId: string): SitterBooking {
+  accept(sitterId: string, bookingId: string): Promise<SitterBooking> {
     return this.act(sitterId, bookingId, 'accept', 'Request accepted. Exact handover times to follow.')
   }
 
-  decline(sitterId: string, bookingId: string, reason?: string): SitterBooking {
+  decline(sitterId: string, bookingId: string, reason?: string): Promise<SitterBooking> {
     const trimmed = reason?.trim()
     return this.act(sitterId, bookingId, 'decline', trimmed ? `Request declined: ${trimmed}` : 'Request declined.')
   }
 
-  cancel(sitterId: string, bookingId: string, reason?: string): SitterBooking {
+  cancel(sitterId: string, bookingId: string, reason?: string): Promise<SitterBooking> {
     const trimmed = reason?.trim()
     return this.act(sitterId, bookingId, 'cancel', trimmed ? `Cancelled by the sitter: ${trimmed}` : 'Cancelled by the sitter.')
   }
 
-  agreeTimes(sitterId: string, bookingId: string, times: AgreeTimesRequest): SitterBooking {
+  agreeTimes(sitterId: string, bookingId: string, times: AgreeTimesRequest): Promise<SitterBooking> {
     return this.act(sitterId, bookingId, 'agree_times',
       `Handover times confirmed: arrive ${times.arrivalTime}, depart ${times.departureTime}.`,
       booking => this.deps.commands.setAgreedTimes(booking.id, times.arrivalTime, times.departureTime, this.deps.clock.now().toISOString()))
   }
 
-  complete(sitterId: string, bookingId: string): SitterBooking {
-    return this.act(sitterId, bookingId, 'complete', 'Stay completed.', (booking) => {
+  complete(sitterId: string, bookingId: string): Promise<SitterBooking> {
+    return this.act(sitterId, bookingId, 'complete', 'Stay completed.', async (booking) => {
       const stayEnded = todayInTimeZone(booking.timezone, this.deps.clock.now()) >= booking.endDate
       if (canApply(booking.status, 'complete') && !stayEnded) {
         throw new InvalidTransitionError('A booking can only be completed once the stay has ended')
@@ -63,9 +63,9 @@ export class SitterBookingService {
     })
   }
 
-  addProgressUpdate(sitterId: string, bookingId: string, input: ProgressUpdateInput): BookingProgressUpdate {
-    return this.deps.transactions.run(() => {
-      const booking = this.require(sitterId, bookingId)
+  addProgressUpdate(sitterId: string, bookingId: string, input: ProgressUpdateInput): Promise<BookingProgressUpdate> {
+    return this.deps.transactions.run(async () => {
+      const booking = await this.require(sitterId, bookingId)
       if (booking.status !== 'confirmed') {
         throw new InvalidTransitionError('Progress updates can only be added to a confirmed booking')
       }
@@ -78,8 +78,8 @@ export class SitterBookingService {
         creatorId: sitterId,
         createdAt,
       }
-      this.deps.commands.insertProgressUpdate(bookingId, update)
-      this.record(bookingId, 'progress_update', `Progress update: ${input.message}`, createdAt)
+      await this.deps.commands.insertProgressUpdate(bookingId, update)
+      await this.record(bookingId, 'progress_update', `Progress update: ${input.message}`, createdAt)
       return update
     })
   }
@@ -89,9 +89,9 @@ export class SitterBookingService {
     bookingId: string,
     input: SitterExpenseInput,
     receipt?: BookingAttachment & { storageKey: string },
-  ): SitterExpense {
-    return this.deps.transactions.run(() => {
-      const booking = this.require(sitterId, bookingId)
+  ): Promise<SitterExpense> {
+    return this.deps.transactions.run(async () => {
+      const booking = await this.require(sitterId, bookingId)
       if (!['confirmed', 'completed'].includes(booking.status)) {
         throw new InvalidTransitionError('Expenses can only be recorded for a confirmed or completed booking')
       }
@@ -101,16 +101,16 @@ export class SitterBookingService {
         creatorId: sitterId,
         createdAt: this.deps.clock.now().toISOString(),
       }
-      this.deps.commands.insertSitterExpense(bookingId, expense)
-      this.record(bookingId, 'expense_recorded', `Expense recorded: ${input.description} (£${(input.amount / 100).toFixed(2)}).`, expense.createdAt)
+      await this.deps.commands.insertSitterExpense(bookingId, expense)
+      await this.record(bookingId, 'expense_recorded', `Expense recorded: ${input.description} (£${(input.amount / 100).toFixed(2)}).`, expense.createdAt)
       if (receipt) {
         if (receipt.kind !== 'receipt' || receipt.expenseId !== undefined || receipt.bookingId !== bookingId) {
           throw new ValidationError('The receipt attachment is invalid', { receipt: ['Receipt must be attached to this booking expense'] })
         }
-        this.deps.commands.insertAttachment({ ...receipt, expenseId: expense.id })
-        this.record(bookingId, 'receipt_added', `Receipt added: ${receipt.fileName}.`, receipt.createdAt)
+        await this.deps.commands.insertAttachment({ ...receipt, expenseId: expense.id })
+        await this.record(bookingId, 'receipt_added', `Receipt added: ${receipt.fileName}.`, receipt.createdAt)
       }
-      const savedReceipt = receipt ? this.deps.queries.findAttachment(bookingId, receipt.id) : undefined
+      const savedReceipt = receipt ? await this.deps.queries.findAttachment(bookingId, receipt.id) : undefined
       return {
         ...expense,
         ...(savedReceipt ? { receipt: savedReceipt } : {}),
@@ -122,9 +122,9 @@ export class SitterBookingService {
     sitterId: string,
     bookingId: string,
     attachment: BookingAttachment & { storageKey: string },
-  ): BookingAttachment {
-    return this.deps.transactions.run(() => {
-      const booking = this.require(sitterId, bookingId)
+  ): Promise<BookingAttachment> {
+    return this.deps.transactions.run(async () => {
+      const booking = await this.require(sitterId, bookingId)
       if (!['confirmed', 'completed'].includes(booking.status)) {
         throw new InvalidTransitionError('Attachments can only be added to a confirmed or completed booking')
       }
@@ -136,38 +136,42 @@ export class SitterBookingService {
       }
       if (attachment.kind === 'receipt') {
         const expense = attachment.expenseId
-          ? this.deps.queries.listSitterExpenses(bookingId).find(item => item.id === attachment.expenseId)
+          ? (await this.deps.queries.listSitterExpenses(bookingId)).find(item => item.id === attachment.expenseId)
           : undefined
         if (!expense) throw new NotFoundError('Expense not found')
       }
       if (attachment.kind === 'photo' && attachment.expenseId) {
         throw new ValidationError('The attachment is invalid', { expenseId: ['Photos cannot be linked to an expense'] })
       }
-      this.deps.commands.insertAttachment(attachment)
+      await this.deps.commands.insertAttachment(attachment)
       const eventType = attachment.kind === 'receipt' ? 'receipt_added' : 'photo_added'
       const detail = attachment.kind === 'receipt' ? `Receipt added: ${attachment.fileName}.` : `Photo added: ${attachment.fileName}.`
-      this.record(bookingId, eventType, detail, attachment.createdAt)
-      return this.deps.queries.findAttachment(bookingId, attachment.id)!
+      await this.record(bookingId, eventType, detail, attachment.createdAt)
+      return (await this.deps.queries.findAttachment(bookingId, attachment.id))!
     })
   }
 
-  removeAttachment(sitterId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
-    return this.deps.transactions.run(() => {
-      this.require(sitterId, bookingId)
-      const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
-      const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+  removeAttachment(sitterId: string, bookingId: string, attachmentId: string): Promise<{ attachment: BookingAttachment, storageKey: string }> {
+    return this.deps.transactions.run(async () => {
+      await this.require(sitterId, bookingId)
+      const [attachment, storageKey] = await Promise.all([
+        this.deps.queries.findAttachment(bookingId, attachmentId),
+        this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId),
+      ])
       if (!attachment || !storageKey) throw new NotFoundError('Attachment not found')
-      this.deps.commands.deleteAttachment(bookingId, attachmentId)
-      this.record(bookingId, 'attachment_removed', `Attachment removed: ${attachment.fileName}.`)
+      await this.deps.commands.deleteAttachment(bookingId, attachmentId)
+      await this.record(bookingId, 'attachment_removed', `Attachment removed: ${attachment.fileName}.`)
       return { attachment, storageKey }
     })
   }
 
-  getAttachment(sitterId: string, bookingId: string, attachmentId: string): { attachment: BookingAttachment, storageKey: string } {
-    const booking = this.require(sitterId, bookingId)
+  async getAttachment(sitterId: string, bookingId: string, attachmentId: string): Promise<{ attachment: BookingAttachment, storageKey: string }> {
+    const booking = await this.require(sitterId, bookingId)
     if (!['confirmed', 'completed'].includes(booking.status)) throw new NotFoundError('Attachment not found')
-    const attachment = this.deps.queries.findAttachment(bookingId, attachmentId)
-    const storageKey = this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId)
+    const [attachment, storageKey] = await Promise.all([
+      this.deps.queries.findAttachment(bookingId, attachmentId),
+      this.deps.queries.findAttachmentStorageKey(bookingId, attachmentId),
+    ])
     if (!attachment || !storageKey) throw new NotFoundError('Attachment not found')
     return { attachment, storageKey }
   }
@@ -177,33 +181,36 @@ export class SitterBookingService {
     bookingId: string,
     action: Parameters<BookingLifecycle['apply']>[1],
     message: string,
-    beforeApply?: (booking: Booking) => void,
-  ): SitterBooking {
-    return this.deps.transactions.run(() => {
-      const booking = this.require(sitterId, bookingId)
-      this.deps.lifecycle.apply(booking, action, 'sitter', message)
-      beforeApply?.(booking)
-      return this.project(this.require(sitterId, bookingId), sitterId)
+    beforeApply?: (booking: Booking) => Promise<void> | void,
+  ): Promise<SitterBooking> {
+    return this.deps.transactions.run(async () => {
+      const booking = await this.require(sitterId, bookingId)
+      await beforeApply?.(booking)
+      await this.deps.lifecycle.apply(booking, action, 'sitter', message)
+      return this.project(await this.require(sitterId, bookingId), sitterId)
     })
   }
 
-  private require(sitterId: string, bookingId: string): Booking {
-    const booking = this.deps.queries.findForSitter(bookingId, sitterId)
+  private async require(sitterId: string, bookingId: string): Promise<Booking> {
+    const booking = await this.deps.queries.findForSitter(bookingId, sitterId)
     if (!booking) throw new NotFoundError('Booking not found')
     return booking
   }
 
-  private project(booking: Booking, sitterId: string): SitterBooking {
+  private async project(booking: Booking, sitterId: string): Promise<SitterBooking> {
     const {
       propertyInstructions, emergencyContact, vet, emergencyInstructions, ...safeBooking
     } = booking
     const discloseSensitiveDetails = ['confirmed', 'completed'].includes(booking.status)
-    const progressUpdates = this.deps.queries.listProgressUpdates(booking.id)
-    const sitterExpenses = this.deps.queries.listSitterExpenses(booking.id)
-    const attachments = this.deps.queries.listAttachments(booking.id)
+    const [progressUpdates, sitterExpenses, attachments, bookerName] = await Promise.all([
+      this.deps.queries.listProgressUpdates(booking.id),
+      this.deps.queries.listSitterExpenses(booking.id),
+      this.deps.queries.listAttachments(booking.id),
+      this.deps.queries.findBookerNameForSitter(booking.id, sitterId),
+    ])
     return {
       ...safeBooking,
-      bookerName: this.deps.queries.findBookerNameForSitter(booking.id, sitterId) ?? '',
+      bookerName: bookerName ?? '',
       ...(discloseSensitiveDetails ? { propertyInstructions, emergencyContact, vet, emergencyInstructions } : {}),
       progressUpdates,
       sitterExpenses,
@@ -211,13 +218,13 @@ export class SitterBookingService {
     }
   }
 
-  private record(
+  private async record(
     bookingId: string,
-    type: Parameters<typeof this.deps.commands.appendHistory>[1]['type'],
+    type: Parameters<BookingCommands['appendHistory']>[1]['type'],
     message: string,
     at?: string,
-  ): void {
-    this.deps.commands.appendHistory(bookingId, {
+  ): Promise<void> {
+    await this.deps.commands.appendHistory(bookingId, {
       id: this.deps.ids.next(),
       at: at ?? this.deps.clock.now().toISOString(),
       type,

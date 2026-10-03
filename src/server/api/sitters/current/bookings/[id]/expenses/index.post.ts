@@ -1,7 +1,7 @@
 import { bookingIdSchema } from '../../../../../../../shared/schemas/booking.ts'
 import { sitterExpenseSchema } from '../../../../../../../shared/schemas/sitter.ts'
 import type { BookingAttachment } from '../../../../../../../shared/types/booking.ts'
-import { PrivateFileStorage } from '../../../../../../storage/PrivateFileStorage.ts'
+import { createPrivateStorage } from '../../../../../../storage/index.ts'
 import { parseValue } from '../../../../../../utils/http.ts'
 import { readMultipartUpload } from '../../../../../../utils/uploads.ts'
 
@@ -16,7 +16,7 @@ export default defineApiHandler(async (event) => {
     description: fields.get('description'),
     amount: Number(fields.get('amount')),
   })
-  const storage = new PrivateFileStorage()
+  const storage = createPrivateStorage()
   const storageKey = file ? await storage.put(file.contents) : undefined
   try {
     const { sitterBookings } = await useServices()
@@ -33,7 +33,7 @@ export default defineApiHandler(async (event) => {
           storageKey,
         }
       : undefined
-    const expense = sitterBookings.addExpense(sitterId, id, input, receipt)
+    const expense = await sitterBookings.addExpense(sitterId, id, input, receipt)
     setResponseStatus(event, 201)
     return expense
   }

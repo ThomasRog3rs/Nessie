@@ -1,7 +1,6 @@
 import type { Sitter, SitterProfile, SitterProfileInput } from '../../shared/types/booking.ts'
 import { NotFoundError, ValidationError } from '../domain/errors.ts'
-import type { SitterRepository } from '../repositories/contracts.ts'
-import type { TransactionRunner } from '../repositories/contracts.ts'
+import type { SitterRepository, TransactionRunner } from '../repositories/contracts.ts'
 import type { IdGenerator } from './ports.ts'
 
 export class SitterService {
@@ -15,22 +14,22 @@ export class SitterService {
     this.ids = ids
   }
 
-  getPreferredSitter(bookerId: string): Sitter {
-    const sitter = this.sitters.findPreferredForBooker(bookerId)
+  async getPreferredSitter(bookerId: string): Promise<Sitter> {
+    const sitter = await this.sitters.findPreferredForBooker(bookerId)
     if (!sitter) throw new NotFoundError('No sitter is linked to this account')
     const { phone: _phone, ...publicSitter } = sitter
     return publicSitter
   }
 
-  getCurrentProfile(sitterId: string): SitterProfile {
-    const sitter = this.sitters.findById(sitterId)
+  async getCurrentProfile(sitterId: string): Promise<SitterProfile> {
+    const sitter = await this.sitters.findById(sitterId)
     if (!sitter) throw new NotFoundError('Sitter profile not found')
     return { ...sitter, phone: sitter.phone ?? '' }
   }
 
-  updateCurrentProfile(sitterId: string, input: SitterProfileInput): SitterProfile {
-    return this.transactions.run(() => {
-      const current = this.sitters.findById(sitterId)
+  async updateCurrentProfile(sitterId: string, input: SitterProfileInput): Promise<SitterProfile> {
+    return this.transactions.run(async () => {
+      const current = await this.sitters.findById(sitterId)
       if (!current) throw new NotFoundError('Sitter profile not found')
       const currentIds = new Set(current.optionalServices.map(service => service.id))
       const submittedIds = input.optionalServices.flatMap(service => service.id ? [service.id] : [])
@@ -50,7 +49,7 @@ export class SitterService {
         ...service,
         id: service.id ?? this.ids.next(),
       }))
-      this.sitters.updateProfile(sitterId, { ...input, acceptedPets, optionalServices })
+      await this.sitters.updateProfile(sitterId, { ...input, acceptedPets, optionalServices })
       return this.getCurrentProfile(sitterId)
     })
   }

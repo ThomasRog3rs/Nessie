@@ -6,8 +6,8 @@ export default defineApiHandler(async (event): Promise<BookerProfile> => {
   const token = parseParam(event, 'token', inviteTokenSchema)
   const input = await parseBody(event, bookerProfileInputSchema)
   const { accounts } = await useServices()
-  if (!accounts.previewInvite(token).valid) throw new GoneError('This invite link is no longer valid. Ask your sitter for a new one.')
-  const profile = accounts.registerBooker(userId, await clerkEmail(event, userId), token, input)
+  if (!(await accounts.previewInvite(token)).valid) throw new GoneError('This invite link is no longer valid. Ask your sitter for a new one.')
+  const profile = await accounts.registerBooker(userId, await clerkEmail(event, userId), token, input)
   setResponseStatus(event, 201)
   return profile
 })

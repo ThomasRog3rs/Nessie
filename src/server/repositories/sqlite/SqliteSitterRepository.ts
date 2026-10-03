@@ -1,4 +1,5 @@
 import type { OptionalService, RateBasis, Sitter } from '../../../shared/types/booking.ts'
+import { getAll, getRow, runStatement } from '../../db/connection.ts'
 import type { Database } from '../../db/connection.ts'
 import type { PersistableSitterProfile, SitterRepository } from '../contracts.ts'
 
@@ -28,38 +29,48 @@ export class SqliteSitterRepository implements SitterRepository {
     this.db = db
   }
 
-  findById(sitterId: string): Sitter | undefined {
-    const row = this.db.prepare('SELECT id, name, bio, location, contact_phone, rate_pence, rate_basis, currency, timezone FROM sitters WHERE id = ?')
-      .get(sitterId) as SitterRow | undefined
+  async findById(sitterId: string): Promise<Sitter | undefined> {
+    const row = await getRow<SitterRow>(
+      this.db,
+      'SELECT id, name, bio, location, contact_phone, rate_pence, rate_basis, currency, timezone FROM sitters WHERE id = ?',
+      [sitterId],
+    )
     return row && this.hydrate(row)
   }
 
-  findPreferredForBooker(bookerId: string): Sitter | undefined {
-    const row = this.db.prepare(`SELECT s.id, s.name, s.bio, s.location, s.contact_phone, s.rate_pence, s.rate_basis, s.currency, s.timezone
+  async findPreferredForBooker(bookerId: string): Promise<Sitter | undefined> {
+    const row = await getRow<SitterRow>(this.db, `SELECT s.id, s.name, s.bio, s.location, s.contact_phone, s.rate_pence, s.rate_basis, s.currency, s.timezone
       FROM sitters s JOIN booker_sitter_links l ON l.sitter_id = s.id
-      WHERE l.booker_id = ? ORDER BY l.created_at, s.id LIMIT 1`).get(bookerId) as SitterRow | undefined
+      WHERE l.booker_id = ? ORDER BY l.created_at, s.id LIMIT 1`, [bookerId])
     return row && this.hydrate(row)
   }
 
-  updateProfile(sitterId: string, input: PersistableSitterProfile): void {
-    this.db.prepare(`UPDATE sitters SET name = ?, location = ?, bio = ?, contact_phone = ?, rate_pence = ?, rate_basis = ?
-      WHERE id = ?`).run(input.name, input.location, input.bio, input.phone, input.rate, input.rateBasis, sitterId)
-    this.db.prepare('DELETE FROM sitter_accepted_pets WHERE sitter_id = ?').run(sitterId)
-    const pet = this.db.prepare('INSERT INTO sitter_accepted_pets (sitter_id, species, position) VALUES (?, ?, ?)')
-    input.acceptedPets.forEach((species, position) => pet.run(sitterId, species, position))
-    this.db.prepare('DELETE FROM sitter_services WHERE sitter_id = ?').run(sitterId)
-    const service = this.db.prepare(`INSERT INTO sitter_services (id, sitter_id, name, description, price_pence, position, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, 1)`)
-    input.optionalServices.forEach((item, position) => service.run(
-      item.id, sitterId, item.name, item.description ?? '', item.price, position,
-    ))
+  async updateProfile(sitterId: string, input: PersistableSitterProfile): Promise<void> {
+    await runStatement(this.db, `UPDATE sitters SET name = ?, location = ?, bio = ?, contact_phone = ?, rate_pence = ?, rate_basis = ?
+      WHERE id = ?`, [input.name, input.location, input.bio, input.phone, input.rate, input.rateBasis, sitterId])
+    await runStatement(this.db, 'DELETE FROM sitter_accepted_pets WHERE sitter_id = ?', [sitterId])
+    for (const [position, species] of input.acceptedPets.entries()) {
+      await runStatement(this.db, 'INSERT INTO sitter_accepted_pets (sitter_id, species, position) VALUES (?, ?, ?)', [sitterId, species, position])
+    }
+    await runStatement(this.db, 'DELETE FROM sitter_services WHERE sitter_id = ?', [sitterId])
+    for (const [position, item] of input.optionalServices.entries()) {
+      await runStatement(this.db, `INSERT INTO sitter_services (id, sitter_id, name, description, price_pence, position, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, 1)`, [item.id, sitterId, item.name, item.description ?? '', item.price, position])
+    }
   }
 
-  private hydrate(row: SitterRow): Sitter {
-    const pets = this.db.prepare('SELECT species FROM sitter_accepted_pets WHERE sitter_id = ? ORDER BY position')
-      .all(row.id) as unknown as Array<{ species: string }>
-    const services = this.db.prepare(`SELECT id, name, description, price_pence FROM sitter_services
-      WHERE sitter_id = ? AND is_active = 1 ORDER BY position`).all(row.id) as unknown as ServiceRow[]
+  private async hydrate(row: SitterRow): Promise<Sitter> {
+    const pets = await getAll<{ species: string }>(
+      this.db,
+      'SELECT species FROM sitter_accepted_pets WHERE sitter_id = ? ORDER BY position',
+      [row.id],
+    )
+    const services = await getAll<ServiceRow>(
+      this.db,
+      `SELECT id, name, description, price_pence FROM sitter_services
+      WHERE sitter_id = ? AND is_active = 1 ORDER BY position`,
+      [row.id],
+    )
     return {
       id: row.id,
       name: row.name,
@@ -71,11 +82,11 @@ export class SqliteSitterRepository implements SitterRepository {
       timezone: row.timezone,
       acceptedPets: pets.map(p => p.species),
       phone: row.contact_phone,
-      optionalServices: services.map((s): OptionalService => ({
-        id: s.id,
-        name: s.name,
-        ...(s.description ? { description: s.description } : {}),
-        price: s.price_pence,
+      optionalServices: services.map((service): OptionalService => ({
+        id: service.id,
+        name: service.name,
+        ...(service.description ? { description: service.description } : {}),
+        price: service.price_pence,
       })),
     }
   }

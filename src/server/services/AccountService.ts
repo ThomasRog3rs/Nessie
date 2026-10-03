@@ -44,36 +44,35 @@ export class AccountService {
     this.ids = deps.ids
   }
 
-  findSitterId(clerkUserId: string): string | undefined {
+  findSitterId(clerkUserId: string): Promise<string | undefined> {
     return this.accounts.findSitterIdByClerkUser(clerkUserId)
   }
 
-  findBookerId(clerkUserId: string): string | undefined {
+  findBookerId(clerkUserId: string): Promise<string | undefined> {
     return this.accounts.findBookerIdByClerkUser(clerkUserId)
   }
 
-  isSitterSignupOpen(): boolean {
-    return this.accounts.countClaimedSitters() === 0
+  async isSitterSignupOpen(): Promise<boolean> {
+    return (await this.accounts.countClaimedSitters()) === 0
   }
 
-  describe(clerkUserId: string | null): AccountState {
+  async describe(clerkUserId: string | null): Promise<AccountState> {
     const role = !clerkUserId ? 'none'
-      : this.findSitterId(clerkUserId) ? 'sitter'
-        : this.findBookerId(clerkUserId) ? 'booker' : 'none'
-    return { signedIn: clerkUserId !== null, role, sitterSignupOpen: this.isSitterSignupOpen() }
+      : await this.findSitterId(clerkUserId) ? 'sitter'
+        : await this.findBookerId(clerkUserId) ? 'booker' : 'none'
+    return { signedIn: clerkUserId !== null, role, sitterSignupOpen: await this.isSitterSignupOpen() }
   }
 
-  registerSitter(clerkUserId: string, email: string, input: SitterProfileInput): SitterProfile {
-    return this.transactions.run(() => {
-      this.assertNoAccount(clerkUserId)
-      if (!this.isSitterSignupOpen()) throw new ForbiddenError('Sitter sign-up is closed')
-      // Demo data from an unauthenticated install is adopted rather than left as a second sitter.
-      let sitterId = this.accounts.findUnclaimedSitterId()
+  async registerSitter(clerkUserId: string, email: string, input: SitterProfileInput): Promise<SitterProfile> {
+    return this.transactions.run(async () => {
+      await this.assertNoAccount(clerkUserId)
+      if (!await this.isSitterSignupOpen()) throw new ForbiddenError('Sitter sign-up is closed')
+      let sitterId = await this.accounts.findUnclaimedSitterId()
       try {
-        if (sitterId) this.accounts.claimSitter(sitterId, clerkUserId, email)
+        if (sitterId) await this.accounts.claimSitter(sitterId, clerkUserId, email)
         else {
           sitterId = this.ids.next()
-          this.accounts.insertSitter({ id: sitterId, clerkUserId, email, createdAt: this.clock.now().toISOString() })
+          await this.accounts.insertSitter({ id: sitterId, clerkUserId, email, createdAt: this.clock.now().toISOString() })
         }
       }
       catch (error) {
@@ -84,77 +83,77 @@ export class AccountService {
     })
   }
 
-  previewInvite(token: string): InvitePreview {
-    const invite = this.accounts.findInviteByHash(hashInviteToken(token))
+  async previewInvite(token: string): Promise<InvitePreview> {
+    const invite = await this.accounts.findInviteByHash(hashInviteToken(token))
     if (!invite || inviteStatus(invite, this.clock.now().toISOString()) !== 'active') return { valid: false }
     return { valid: true, sitterName: invite.sitterName }
   }
 
-  registerBooker(clerkUserId: string, email: string, token: string, input: BookerProfileInput): BookerProfile {
-    return this.transactions.run(() => {
-      this.assertNoAccount(clerkUserId)
+  async registerBooker(clerkUserId: string, email: string, token: string, input: BookerProfileInput): Promise<BookerProfile> {
+    return this.transactions.run(async () => {
+      await this.assertNoAccount(clerkUserId)
       const now = this.clock.now().toISOString()
-      const invite = this.accounts.findInviteByHash(hashInviteToken(token))
+      const invite = await this.accounts.findInviteByHash(hashInviteToken(token))
       if (!invite || inviteStatus(invite, now) !== 'active') throw this.invalidInvite()
       const bookerId = this.ids.next()
       try {
-        this.accounts.insertBooker({ id: bookerId, clerkUserId, email, createdAt: now, profile: input })
+        await this.accounts.insertBooker({ id: bookerId, clerkUserId, email, createdAt: now, profile: input })
       }
       catch (error) {
         rethrowDuplicate(error)
       }
-      if (!this.accounts.consumeInvite(invite.id, bookerId, now)) throw this.invalidInvite()
-      this.accounts.linkBookerToSitter(bookerId, invite.sitterId, now)
+      if (!await this.accounts.consumeInvite(invite.id, bookerId, now)) throw this.invalidInvite()
+      await this.accounts.linkBookerToSitter(bookerId, invite.sitterId, now)
       return this.getBookerProfile(bookerId)
     })
   }
 
-  getBookerProfile(bookerId: string): BookerProfile {
-    const profile = this.accounts.findBookerProfile(bookerId)
+  async getBookerProfile(bookerId: string): Promise<BookerProfile> {
+    const profile = await this.accounts.findBookerProfile(bookerId)
     if (!profile) throw new NotFoundError('Profile not found')
     return profile
   }
 
-  updateBookerProfile(bookerId: string, input: BookerProfileInput): BookerProfile {
-    return this.transactions.run(() => {
-      this.getBookerProfile(bookerId)
-      this.accounts.updateBookerProfile(bookerId, input)
+  async updateBookerProfile(bookerId: string, input: BookerProfileInput): Promise<BookerProfile> {
+    return this.transactions.run(async () => {
+      await this.getBookerProfile(bookerId)
+      await this.accounts.updateBookerProfile(bookerId, input)
       return this.getBookerProfile(bookerId)
     })
   }
 
-  createInvite(sitterId: string, input: { label?: string | undefined, expiresInHours: number }): CreatedBookerInvite {
+  async createInvite(sitterId: string, input: { label?: string | undefined, expiresInHours: number }): Promise<CreatedBookerInvite> {
     const now = this.clock.now()
     const token = randomBytes(32).toString('base64url')
     const id = this.ids.next()
     const createdAt = now.toISOString()
     const expiresAt = new Date(now.getTime() + input.expiresInHours * HOUR_MS).toISOString()
     const label = input.label ?? ''
-    this.accounts.insertInvite({ id, sitterId, tokenHash: hashInviteToken(token), label, createdAt, expiresAt })
+    await this.accounts.insertInvite({ id, sitterId, tokenHash: hashInviteToken(token), label, createdAt, expiresAt })
     return { id, label, createdAt, expiresAt, status: 'active', token }
   }
 
-  listInvites(sitterId: string): BookerInvite[] {
+  async listInvites(sitterId: string): Promise<BookerInvite[]> {
     const now = this.clock.now().toISOString()
-    return this.accounts.listInvites(sitterId).map(({ disabledAt, ...invite }) => ({
+    return (await this.accounts.listInvites(sitterId)).map(({ disabledAt, ...invite }) => ({
       ...invite,
       status: inviteStatus({ ...invite, ...(disabledAt ? { disabledAt } : {}) }, now),
     }))
   }
 
-  disableInvite(sitterId: string, inviteId: string): void {
-    const invite = this.accounts.listInvites(sitterId).find(candidate => candidate.id === inviteId)
+  async disableInvite(sitterId: string, inviteId: string): Promise<void> {
+    const invite = (await this.accounts.listInvites(sitterId)).find(candidate => candidate.id === inviteId)
     if (!invite) throw new NotFoundError('Invite link not found')
     if (invite.usedAt) throw new ConflictError('This link has already been used')
-    this.accounts.disableInvite(sitterId, inviteId, this.clock.now().toISOString())
+    await this.accounts.disableInvite(sitterId, inviteId, this.clock.now().toISOString())
   }
 
-  listLinkedBookers(sitterId: string): LinkedBooker[] {
+  listLinkedBookers(sitterId: string): Promise<LinkedBooker[]> {
     return this.accounts.listBookersForSitter(sitterId)
   }
 
-  private assertNoAccount(clerkUserId: string): void {
-    if (this.findSitterId(clerkUserId) || this.findBookerId(clerkUserId)) {
+  private async assertNoAccount(clerkUserId: string): Promise<void> {
+    if (await this.findSitterId(clerkUserId) || await this.findBookerId(clerkUserId)) {
       throw new ConflictError('This sign-in already has an account')
     }
   }

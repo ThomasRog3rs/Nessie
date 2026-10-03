@@ -1,0 +1,22 @@
+[build]
+  base = "src"
+  # Migrate the production schema (no seed), then build. A failed migration fails the deploy.
+  command = "npm run db:migrate && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  NESSIE_BACKUP_STORE = "netlify-blobs"
+  NESSIE_STORAGE = "netlify-blobs"
+  NESSIE_SEED_ON_EMPTY = "false"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

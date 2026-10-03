@@ -24,10 +24,10 @@ export class BookingLifecycle {
     this.ids = ids
   }
 
-  apply(booking: Booking, action: BookingAction, actor: ActorRole, message: string): void {
+  async apply(booking: Booking, action: BookingAction, actor: ActorRole, message: string): Promise<void> {
     const status = nextStatus(booking.status, action)
     const at = this.clock.now().toISOString()
-    this.commands.updateStatus(booking.id, status, at)
-    this.commands.appendHistory(booking.id, { id: this.ids.next(), at, type: HISTORY_TYPE[action], actor, message })
+    await this.commands.updateStatus(booking.id, status, at)
+    await this.commands.appendHistory(booking.id, { id: this.ids.next(), at, type: HISTORY_TYPE[action], actor, message })
   }
 }

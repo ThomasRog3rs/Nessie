@@ -12,7 +12,7 @@ export const TODAY = '2030-01-01'
 export const migrationSource = new FileMigrationSource(resolve(import.meta.dirname, '../server/db/migrations'))
 
 export async function createMigratedDatabase(): Promise<Database> {
-  const db = openDatabase(':memory:')
+  const db = await openDatabase('file::memory:')
   await new Migrator(db, migrationSource).migrate()
   return db
 }
@@ -27,7 +27,7 @@ export interface TestContext {
 /** Seeded in-memory app whose clock is fixed at noon on TODAY. */
 export async function createContext(): Promise<TestContext> {
   const db = await createMigratedDatabase()
-  seedDatabase(db, TODAY)
+  await seedDatabase(db, TODAY)
   const services = createServices(db, { clock: { now: () => new Date(`${TODAY}T12:00:00Z`) } })
   return { db, services, bookerId: SEED_BOOKER_ID, sitterId: SEED_SITTER_ID }
 }

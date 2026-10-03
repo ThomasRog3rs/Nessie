@@ -18,35 +18,35 @@ export class AvailabilityBlockService {
     this.ids = ids
   }
 
-  list(sitterId: string): AvailabilityBlock[] {
+  list(sitterId: string): Promise<AvailabilityBlock[]> {
     return this.blocks.listAll(sitterId)
   }
 
-  create(sitterId: string, input: AvailabilityBlockInput): AvailabilityBlock {
-    this.assertNoBookingClash(sitterId, input)
+  async create(sitterId: string, input: AvailabilityBlockInput): Promise<AvailabilityBlock> {
+    await this.assertNoBookingClash(sitterId, input)
     return this.blocks.insert(sitterId, input, this.ids.next(), this.clock.now().toISOString())
   }
 
-  update(sitterId: string, blockId: string, input: AvailabilityBlockInput): AvailabilityBlock {
-    this.require(sitterId, blockId)
-    this.assertNoBookingClash(sitterId, input)
-    this.blocks.update(blockId, input)
+  async update(sitterId: string, blockId: string, input: AvailabilityBlockInput): Promise<AvailabilityBlock> {
+    await this.require(sitterId, blockId)
+    await this.assertNoBookingClash(sitterId, input)
+    await this.blocks.update(blockId, input)
     return { id: blockId, ...input }
   }
 
-  remove(sitterId: string, blockId: string): void {
-    this.require(sitterId, blockId)
-    this.blocks.delete(blockId)
+  async remove(sitterId: string, blockId: string): Promise<void> {
+    await this.require(sitterId, blockId)
+    await this.blocks.delete(blockId)
   }
 
-  private require(sitterId: string, blockId: string): AvailabilityBlock {
-    const block = this.blocks.findById(sitterId, blockId)
+  private async require(sitterId: string, blockId: string): Promise<AvailabilityBlock> {
+    const block = await this.blocks.findById(sitterId, blockId)
     if (!block) throw new NotFoundError('Availability block not found')
     return block
   }
 
-  private assertNoBookingClash(sitterId: string, input: AvailabilityBlockInput): void {
-    if (this.bookings.listActiveSpans(sitterId, input.startDate, addDays(input.endDate, 1)).length > 0) {
+  private async assertNoBookingClash(sitterId: string, input: AvailabilityBlockInput): Promise<void> {
+    if ((await this.bookings.listActiveSpans(sitterId, input.startDate, addDays(input.endDate, 1))).length > 0) {
       throw new ConflictError('These dates overlap an existing booking. Cancel the booking first.')
     }
   }
