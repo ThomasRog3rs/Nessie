@@ -2,6 +2,8 @@
 
 Netlify's filesystem is ephemeral, so production uses hosted SQLite (Turso/libSQL) for data, Netlify Blobs for private uploads and backups.
 
+> **Important:** Clerk Production requires a domain you own and can configure DNS for. A `*.netlify.app` address is not enough. You can keep Netlify hosting: connect a custom domain (for example, `app.example.com`) to the Netlify site, then configure and verify the required Clerk DNS records for that domain. The Netlify address can still be used for deploy previews, but don't use it as the production Clerk domain.
+
 | Concern | Dev | Production |
 | --- | --- | --- |
 | Database | `file:.data/nessie.sqlite` | Turso (`libsql://…`) |
@@ -20,7 +22,8 @@ Netlify's filesystem is ephemeral, so production uses hosted SQLite (Turso/libSQ
 
 ### 2. Clerk (production)
 - [ ] In the Clerk dashboard, create the **Production** instance (clone settings from Development).
-- [ ] Add your production domain and create the DNS records Clerk lists (frontend API, accounts, email/DKIM CNAMEs); wait until all show verified.
+- [ ] Use a domain you own for production (not the site's `*.netlify.app` hostname); add it as your Netlify custom domain in step 3.
+- [ ] Add the domain in Clerk and create the DNS records Clerk lists (frontend API, accounts, email/DKIM CNAMEs); wait until all show verified. Clerk may need up to 48 hours for DNS propagation.
 - [ ] Configure your own OAuth credentials for any social providers (Clerk's shared dev credentials don't work in production).
 - [ ] Copy the `pk_live_…` and `sk_live_…` keys from API keys.
 - [ ] Re-check sign-in methods, email verification and restrictions (consider "Restricted"/invite-only sign-up since Nesse is private).
@@ -33,7 +36,7 @@ Netlify's filesystem is ephemeral, so production uses hosted SQLite (Turso/libSQ
   - `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_live_…`), `NUXT_CLERK_SECRET_KEY` (`sk_live_…`)
   - `NUXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NUXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
   - optional: `NESSIE_BACKUP_KEEP_DAILY` (14), `NESSIE_BACKUP_KEEP_WEEKLY` (8)
-- [ ] Attach the custom domain and enable HTTPS; make sure it matches the domain configured in Clerk.
+- [ ] Attach the custom domain and enable HTTPS; use that domain as the production URL and make sure it matches the domain configured in Clerk.
 
 ### 4. First deploy
 - [ ] Trigger a deploy; confirm the log shows `Applied: 0001…, 0002…, 0003…`. A failed migration fails the deploy and leaves the previous version live.
