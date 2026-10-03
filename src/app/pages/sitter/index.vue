@@ -33,8 +33,8 @@ const profileCompletion = computed(() => Math.round(completedProfileFields.value
       color="info"
       variant="subtle"
       icon="i-lucide-flask-conical"
-      title="Sitter preview"
-      description="This is a front-end preview. Changes are held in this tab only; profile edits and files are not sent to a server."
+      title="Sitter workspace"
+      description="Your requests, profile, availability and booking records are stored by Nesse."
     />
 
     <section aria-label="At a glance" class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -148,7 +148,7 @@ const profileCompletion = computed(() => Math.round(completedProfileFields.value
           View bookings <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
         </NuxtLink>
       </div>
-      <p class="mt-3 text-sm text-muted">{{ bookings.length }} sample bookings in this preview.</p>
+      <p class="mt-3 text-sm text-muted">{{ bookings.length }} bookings in this workspace.</p>
     </section>
   </div>
 </template>

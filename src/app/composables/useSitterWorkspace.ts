@@ -1,4 +1,8 @@
-export type SitterWorkspaceStatus = 'requested' | 'declined' | 'accepted_times_pending' | 'confirmed' | 'completed' | 'cancelled'
+import type {
+  AvailabilityBlock, BookingAttachment, SitterBooking, SitterExpense, SitterProfile,
+} from '../../shared/types/booking.ts'
+
+export type SitterWorkspaceStatus = SitterBooking['status']
 export type SitterExpenseCategory = 'travel' | 'incidental'
 
 export interface SitterProfileDraft {
@@ -9,7 +13,7 @@ export interface SitterProfileDraft {
   rateBasis: 'per_night' | 'per_day'
   acceptedPets: string[]
   phone: string
-  services: { id: string, name: string, pricePence: number }[]
+  services: { id?: string, name: string, pricePence: number }[]
 }
 
 export interface SitterWorkspacePet {
@@ -24,6 +28,7 @@ export interface SitterWorkspaceExpense {
   description: string
   amountPence: number
   fileName: string
+  receiptUrl?: string
   createdAt: string
 }
 
@@ -54,10 +59,15 @@ export interface SitterWorkspaceBooking {
   bookerName: string
   bookerInitials: string
   requestedAt: string
+  timezone: string
   startDate: string
   endDate: string
   arrivalTime: string
   departureTime: string
+  requestedArrivalTime: string
+  requestedDepartureTime: string
+  agreedArrivalTime: string | null
+  agreedDepartureTime: string | null
   status: SitterWorkspaceStatus
   pets: SitterWorkspacePet[]
   careNotes: string
@@ -77,287 +87,217 @@ export interface SitterWorkspaceBooking {
   events: SitterWorkspaceEvent[]
 }
 
-export interface SitterUnavailableBlock {
-  id: string
-  startDate: string
-  endDate: string
-  reason: string
+export type SitterUnavailableBlock = AvailabilityBlock
+
+interface WorkspaceData {
+  profile: SitterProfile
+  bookings: SitterBooking[]
+  unavailableBlocks: AvailabilityBlock[]
 }
 
-function dateOffset(days: number): string {
-  const date = new Date()
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
+async function loadWorkspace(): Promise<WorkspaceData> {
+  const [profile, bookings, unavailableBlocks] = await Promise.all([
+    $fetch<SitterProfile>('/api/sitters/current/profile'),
+    $fetch<SitterBooking[]>('/api/sitters/current/bookings'),
+    $fetch<AvailabilityBlock[]>('/api/sitters/current/blocks'),
+  ])
+  return { profile, bookings, unavailableBlocks }
 }
 
-function demoBookings(): SitterWorkspaceBooking[] {
-  const now = new Date().toISOString()
-  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
-  return [
-    {
-      id: 'request-olivia',
-      bookerName: 'Olivia Parker',
-      bookerInitials: 'OP',
-      requestedAt: now,
-      startDate: dateOffset(12),
-      endDate: dateOffset(16),
-      arrivalTime: '16:00',
-      departureTime: '10:00',
-      status: 'requested',
-      pets: [{ name: 'Milo', species: 'Golden retriever', notes: 'Two walks a day; he loves the river path.' }],
-      careNotes: 'Please water the herbs in the kitchen and bring in any parcels.',
-      propertyNotes: 'Entry instructions are available in the confirmed booking.',
-      services: ['Dog walking'],
-      requestedTravelPence: 1800,
-      requestedIncidentals: [],
-      emergencyContact: { name: 'Ruth Parker', relationship: 'Neighbour', phone: '07700 900 818' },
-      vet: { name: 'Clifton Veterinary Centre', phone: '0117 555 0182' },
-      emergencyInstructions: 'Call Ruth first if you cannot reach Olivia.',
-      alternativeCareTermAcknowledged: false,
-      declineReason: '',
-      cancellationReason: '',
-      expenses: [],
-      photos: [],
-      updates: [],
-      events: [{ id: 'event-request-olivia', actor: 'booker', label: 'Request received', detail: 'Olivia sent a booking request.', createdAt: now }],
-    },
-    {
-      id: 'request-james',
-      bookerName: 'James Holloway',
-      bookerInitials: 'JH',
-      requestedAt: minutesAgo(10),
-      startDate: dateOffset(22),
-      endDate: dateOffset(25),
-      arrivalTime: '17:30',
-      departureTime: '09:30',
-      status: 'accepted_times_pending',
-      pets: [{ name: 'Pip', species: 'Tabby cat', notes: 'Medication with breakfast.' }],
-      careNotes: 'Pip is shy at first. His carrier and vet details are in the care pack.',
-      propertyNotes: 'Full house instructions are shared after confirming handover times.',
-      services: [],
-      requestedTravelPence: 0,
-      requestedIncidentals: [],
-      emergencyContact: { name: 'Sam Holloway', relationship: 'Partner', phone: '07700 900 237' },
-      vet: { name: 'Redland Pet Clinic', phone: '0117 555 0166' },
-      emergencyInstructions: 'Call James or Sam for any urgent care decisions.',
-      alternativeCareTermAcknowledged: true,
-      declineReason: '',
-      cancellationReason: '',
-      expenses: [],
-      photos: [],
-      updates: [],
-      events: [
-        { id: 'event-accept-james', actor: 'sitter', label: 'Request accepted', detail: 'Exact handover times still need agreement.', createdAt: minutesAgo(5) },
-        { id: 'event-request-james', actor: 'booker', label: 'Request received', detail: 'James sent a booking request.', createdAt: minutesAgo(10) },
-      ],
-    },
-    {
-      id: 'stay-amina',
-      bookerName: 'Amina Shah',
-      bookerInitials: 'AS',
-      requestedAt: minutesAgo(4 * 24 * 60),
-      startDate: dateOffset(4),
-      endDate: dateOffset(8),
-      arrivalTime: '15:00',
-      departureTime: '11:00',
-      status: 'confirmed',
-      pets: [
-        { name: 'Fern', species: 'Whippet', notes: 'One long walk and one short walk each day.' },
-        { name: 'Olive', species: 'House cat', notes: 'Fresh water each morning.' },
-      ],
-      careNotes: 'The neighbours know you are staying. Please bring the bins out on Thursday evening.',
-      propertyNotes: 'Entry and emergency instructions have been shared in the booking.',
-      services: ['Dog walking'],
-      requestedTravelPence: 2400,
-      requestedIncidentals: [{ description: 'Pet food top-up', amountPence: 950 }],
-      emergencyContact: { name: 'Maya Shah', relationship: 'Sister', phone: '07700 900 412' },
-      vet: { name: 'Harbourside Veterinary Surgery', phone: '0117 555 0144' },
-      emergencyInstructions: 'Call Amina first. Maya can help if Amina is travelling.',
-      alternativeCareTermAcknowledged: true,
-      declineReason: '',
-      cancellationReason: '',
-      expenses: [],
-      photos: [],
-      updates: [
-        { id: 'update-amina-1', message: 'Everything is ready for Fern and Olive. I’ll message if anything comes up.', createdAt: minutesAgo(60) },
-      ],
-      events: [
-        { id: 'event-update-amina', actor: 'sitter', label: 'Progress update posted', detail: 'Everything is ready for Fern and Olive. I’ll message if anything comes up.', createdAt: minutesAgo(60) },
-        { id: 'event-times-amina', actor: 'sitter', label: 'Handover times agreed', detail: 'Arrival and departure times were confirmed.', createdAt: minutesAgo(2 * 24 * 60) },
-        { id: 'event-accept-amina', actor: 'sitter', label: 'Request accepted', detail: 'The request was accepted.', createdAt: minutesAgo(3 * 24 * 60) },
-        { id: 'event-request-amina', actor: 'booker', label: 'Request received', detail: 'Amina sent a booking request.', createdAt: minutesAgo(4 * 24 * 60) },
-      ],
-    },
-    {
-      id: 'stay-george',
-      bookerName: 'George Reed',
-      bookerInitials: 'GR',
-      requestedAt: minutesAgo(22 * 24 * 60),
-      startDate: dateOffset(-21),
-      endDate: dateOffset(-18),
-      arrivalTime: '14:00',
-      departureTime: '10:00',
-      status: 'completed',
-      pets: [{ name: 'Bean', species: 'Rescue cat', notes: 'A quiet spot to nap is all she needs.' }],
-      careNotes: 'Please keep the back door locked after the evening feed.',
-      propertyNotes: 'Booking instructions were shared with the sitter.',
-      services: [],
-      requestedTravelPence: 0,
-      requestedIncidentals: [],
-      emergencyContact: { name: 'Leo Reed', relationship: 'Brother', phone: '07700 900 512' },
-      vet: { name: 'Westside Vets', phone: '0117 555 0110' },
-      emergencyInstructions: 'Call Leo if George is unavailable.',
-      alternativeCareTermAcknowledged: false,
-      declineReason: '',
-      cancellationReason: '',
-      expenses: [],
-      photos: [],
-      updates: [],
-      events: [
-        { id: 'event-complete-george', actor: 'sitter', label: 'Sit completed', detail: 'The booking was marked complete.', createdAt: minutesAgo(18 * 24 * 60) },
-        { id: 'event-times-george', actor: 'sitter', label: 'Handover times agreed', detail: 'Arrival and departure times were confirmed.', createdAt: minutesAgo(20 * 24 * 60) },
-        { id: 'event-accept-george', actor: 'sitter', label: 'Request accepted', detail: 'The request was accepted.', createdAt: minutesAgo(21 * 24 * 60) },
-        { id: 'event-request-george', actor: 'booker', label: 'Request received', detail: 'George sent a booking request.', createdAt: minutesAgo(22 * 24 * 60) },
-      ],
-    },
-  ]
+function toProfileDraft(profile?: SitterProfile): SitterProfileDraft {
+  return {
+    name: profile?.name ?? '',
+    location: profile?.location ?? '',
+    bio: profile?.bio ?? '',
+    ratePence: profile?.rate ?? 0,
+    rateBasis: profile?.rateBasis ?? 'per_night',
+    acceptedPets: profile?.acceptedPets ?? [],
+    phone: profile?.phone ?? '',
+    services: profile?.optionalServices.map(service => ({
+      id: service.id,
+      name: service.name,
+      pricePence: service.price,
+    })) ?? [],
+  }
 }
 
-function createEventId() {
-  return `event-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+function eventLabel(type: string): string {
+  const labels: Record<string, string> = {
+    requested: 'Request received',
+    accepted: 'Request accepted',
+    declined: 'Request declined',
+    times_proposed: 'Handover times proposed',
+    times_agreed: 'Handover times agreed',
+    changed: 'Booking changed',
+    cancelled: 'Booking cancelled',
+    completed: 'Sit completed',
+    progress_update: 'Progress update posted',
+    expense_recorded: 'Expense recorded',
+    photo_added: 'Photo shared',
+    receipt_added: 'Receipt added',
+    attachment_removed: 'Attachment removed',
+  }
+  return labels[type] ?? type
 }
 
-function findBooking(bookings: SitterWorkspaceBooking[], id: string): SitterWorkspaceBooking {
-  const booking = bookings.find(item => item.id === id)
-  if (!booking) throw new Error(`Sitter preview booking "${id}" was not found.`)
-  return booking
+function mapBooking(booking: SitterBooking): SitterWorkspaceBooking {
+  const history = booking.history
+  const declined = [...history].reverse().find(event => event.type === 'declined')
+  const cancelled = [...history].reverse().find(event => event.type === 'cancelled')
+  const services = booking.services.map(service => service.name)
+  const attachments = booking.attachments
+  return {
+    id: booking.id,
+    bookerName: booking.bookerName,
+    bookerInitials: booking.bookerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase(),
+    requestedAt: booking.createdAt,
+    timezone: booking.timezone,
+    startDate: booking.startDate,
+    endDate: booking.endDate,
+    arrivalTime: booking.agreedArrivalTime ?? booking.arrivalTime,
+    departureTime: booking.agreedDepartureTime ?? booking.departureTime,
+    requestedArrivalTime: booking.arrivalTime,
+    requestedDepartureTime: booking.departureTime,
+    agreedArrivalTime: booking.agreedArrivalTime,
+    agreedDepartureTime: booking.agreedDepartureTime,
+    status: booking.status,
+    pets: booking.pets,
+    careNotes: booking.careNotes,
+    propertyNotes: booking.propertyInstructions ?? '',
+    services,
+    requestedTravelPence: booking.travelReimbursement.amount,
+    requestedIncidentals: booking.incidentalExpenses.map(expense => ({
+      description: expense.description,
+      amountPence: expense.amount,
+    })),
+    emergencyContact: booking.emergencyContact ?? { name: '', relationship: '', phone: '' },
+    vet: booking.vet ?? { name: '', phone: '' },
+    emergencyInstructions: booking.emergencyInstructions ?? '',
+    alternativeCareTermAcknowledged: booking.cancellationTermAcknowledged,
+    declineReason: declined?.message.replace(/^Request declined:\s*/, '').replace(/^Request declined\.$/, '') ?? '',
+    cancellationReason: cancelled?.message ?? '',
+    expenses: booking.sitterExpenses.map((expense: SitterExpense) => ({
+      id: expense.id,
+      category: expense.category,
+      description: expense.description,
+      amountPence: expense.amount,
+      fileName: expense.receipt?.fileName ?? '',
+      ...(expense.receipt ? {
+        receiptUrl: `/api/sitters/current/bookings/${booking.id}/attachments/${expense.receipt.id}`,
+      } : {}),
+      createdAt: expense.createdAt,
+    })),
+    photos: attachments.filter(file => file.kind === 'photo').map((photo: BookingAttachment) => ({
+      id: photo.id,
+      url: `/api/sitters/current/bookings/${booking.id}/attachments/${photo.id}`,
+      fileName: photo.fileName,
+      caption: photo.caption ?? '',
+      createdAt: photo.createdAt,
+    })),
+    updates: booking.progressUpdates.map(update => ({
+      id: update.id,
+      message: update.message,
+      createdAt: update.createdAt,
+    })),
+    events: history.map(event => ({
+      id: event.id,
+      actor: event.actor,
+      label: eventLabel(event.type),
+      detail: event.message,
+      createdAt: event.at,
+    })),
+  }
 }
 
 export function useSitterWorkspace() {
-  const profile = useState<SitterProfileDraft>('sitter-preview-profile', () => ({
-    name: 'Thomas Rogers',
-    location: 'Bristol, UK',
-    bio: 'Thoughtful, reliable house sitter who loves getting to know the routines that make your pets feel at home. I work flexibly and can usually arrange a visit before the sit.',
-    ratePence: 6800,
-    rateBasis: 'per_night',
-    acceptedPets: ['Dogs', 'Cats', 'Small animals'],
-    phone: '07700 900 246',
-    services: [{ id: 'service-walking', name: 'Dog walking', pricePence: 1200 }],
-  }))
-  const bookings = useState<SitterWorkspaceBooking[]>('sitter-preview-bookings', demoBookings)
-  const unavailableBlocks = useState<SitterUnavailableBlock[]>('sitter-preview-unavailable', () => [
-    { id: 'block-autumn-break', startDate: dateOffset(35), endDate: dateOffset(38), reason: 'Personal plans' },
-  ])
+  const api = useSitterApi()
+  const { data, pending, error, refresh } = useAsyncData('sitter-workspace', loadWorkspace)
 
+  const profile = computed(() => toProfileDraft(data.value?.profile))
+  const bookings = computed(() => data.value?.bookings.map(mapBooking) ?? [])
+  const unavailableBlocks = computed(() => data.value?.unavailableBlocks ?? [])
   const pendingRequests = computed(() => bookings.value.filter(booking => booking.status === 'requested'))
-  const upcomingBookings = computed(() =>
-    bookings.value
-      .filter(booking => ['accepted_times_pending', 'confirmed'].includes(booking.status) && booking.endDate >= dateOffset(0))
-      .sort((a, b) => a.startDate.localeCompare(b.startDate)),
-  )
+  const upcomingBookings = computed(() => bookings.value
+    .filter(booking => ['accepted_times_pending', 'confirmed'].includes(booking.status))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate)))
 
-  function updateStatus(id: string, status: SitterWorkspaceStatus, declineReason = '') {
-    const booking = findBooking(bookings.value, id)
-    booking.status = status
-    booking.declineReason = declineReason
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: status === 'declined' ? 'Request declined' : 'Request accepted',
-      detail: status === 'declined' ? declineReason || 'No reason was added.' : 'Exact handover times still need agreement.',
-      createdAt: new Date().toISOString(),
+  async function updateStatus(id: string, status: SitterWorkspaceStatus, declineReason = '') {
+    if (status === 'accepted_times_pending') await api.acceptBooking(id)
+    else if (status === 'declined') await api.declineBooking(id, { reason: declineReason })
+    else throw new Error(`Unsupported sitter request decision: ${status}`)
+    await refresh()
+  }
+
+  async function confirmHandoverTimes(id: string, arrivalTime: string, departureTime: string) {
+    await api.agreeTimes(id, { arrivalTime, departureTime })
+    await refresh()
+  }
+
+  async function cancelBooking(id: string, reason: string) {
+    await api.cancelBooking(id, { reason })
+    await refresh()
+  }
+
+  async function addExpense(
+    id: string,
+    expense: { category: SitterExpenseCategory, description: string, amountPence: number },
+    receipt?: File,
+  ) {
+    const saved = await api.addExpense(id, {
+      category: expense.category,
+      description: expense.description,
+      amount: expense.amountPence,
+    }, receipt)
+    await refresh()
+    return saved
+  }
+
+  async function addPhotos(id: string, files: File[], caption: string) {
+    for (const file of files) await api.uploadPhoto(id, file, caption)
+    await refresh()
+  }
+
+  async function removePhoto(id: string, photoId: string) {
+    await api.deleteAttachment(id, photoId)
+    await refresh()
+  }
+
+  async function addUpdate(id: string, update: { message: string, date?: string }) {
+    await api.addProgressUpdate(id, update)
+    await refresh()
+  }
+
+  async function completeBooking(id: string) {
+    await api.completeBooking(id)
+    await refresh()
+  }
+
+  async function addUnavailableBlock(block: Omit<AvailabilityBlock, 'id'>) {
+    await api.createBlock(block)
+    await refresh()
+  }
+
+  async function removeUnavailableBlock(id: string) {
+    await api.deleteBlock(id)
+    await refresh()
+  }
+
+  async function saveProfile(value: SitterProfileDraft) {
+    await api.updateProfile({
+      name: value.name,
+      location: value.location,
+      bio: value.bio,
+      phone: value.phone,
+      rate: value.ratePence,
+      rateBasis: value.rateBasis,
+      acceptedPets: value.acceptedPets,
+      optionalServices: value.services.map(service => ({
+        id: service.id,
+        name: service.name,
+        price: service.pricePence,
+      })),
     })
-  }
-
-  function confirmHandoverTimes(id: string, arrivalTime: string, departureTime: string) {
-    const booking = findBooking(bookings.value, id)
-    booking.arrivalTime = arrivalTime
-    booking.departureTime = departureTime
-    booking.status = 'confirmed'
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Handover times agreed',
-      detail: `Arrival ${arrivalTime}; departure ${departureTime}.`,
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  function cancelBooking(id: string, reason: string) {
-    const booking = findBooking(bookings.value, id)
-    booking.status = 'cancelled'
-    booking.cancellationReason = reason
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Booking cancelled by sitter',
-      detail: reason || 'No reason was added.',
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  function addExpense(id: string, expense: SitterWorkspaceExpense) {
-    const booking = findBooking(bookings.value, id)
-    booking.expenses.unshift(expense)
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Expense recorded',
-      detail: `${expense.description} · ${formatMoney(expense.amountPence)}`,
-      createdAt: expense.createdAt,
-    })
-  }
-
-  function addPhoto(id: string, photo: SitterWorkspacePhoto) {
-    const booking = findBooking(bookings.value, id)
-    booking.photos.unshift(photo)
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Photo shared',
-      detail: photo.fileName,
-      createdAt: photo.createdAt,
-    })
-  }
-
-  function removePhoto(id: string, photoId: string) {
-    const booking = findBooking(bookings.value, id)
-    const index = booking.photos.findIndex(photo => photo.id === photoId)
-    if (index === -1) return
-    const [photo] = booking.photos.splice(index, 1)
-    if (!photo) return
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Photo removed',
-      detail: photo.fileName,
-      createdAt: new Date().toISOString(),
-    })
-    URL.revokeObjectURL(photo.url)
-  }
-
-  function addUpdate(id: string, update: SitterWorkspaceUpdate) {
-    const booking = findBooking(bookings.value, id)
-    booking.updates.unshift(update)
-    booking.events.unshift({
-      id: createEventId(),
-      actor: 'sitter',
-      label: 'Progress update posted',
-      detail: update.message,
-      createdAt: update.createdAt,
-    })
-  }
-
-  function addUnavailableBlock(block: SitterUnavailableBlock) {
-    unavailableBlocks.value.push(block)
-  }
-
-  function removeUnavailableBlock(id: string) {
-    unavailableBlocks.value = unavailableBlocks.value.filter(block => block.id !== id)
-  }
-
-  function saveProfile(value: SitterProfileDraft) {
-    profile.value = { ...value, acceptedPets: [...value.acceptedPets], services: value.services.map(service => ({ ...service })) }
+    await refresh()
   }
 
   return {
@@ -366,11 +306,15 @@ export function useSitterWorkspace() {
     unavailableBlocks,
     pendingRequests,
     upcomingBookings,
+    pending,
+    error,
+    refresh,
     updateStatus,
     confirmHandoverTimes,
     cancelBooking,
+    completeBooking,
     addExpense,
-    addPhoto,
+    addPhotos,
     removePhoto,
     addUpdate,
     addUnavailableBlock,

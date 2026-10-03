@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { addDays } from '#shared/utils/dateRange'
+
 definePageMeta({ layout: 'sitter' })
 useHead({ title: 'Sitter availability · Nesse' })
 
@@ -11,14 +13,15 @@ const reason = ref('')
 const formError = ref('')
 
 const scheduledBookings = computed(() => bookings.value
-  .filter(booking => ['accepted_times_pending', 'confirmed'].includes(booking.status) && booking.endDate >= today)
+  .filter(booking => ['requested', 'accepted_times_pending', 'confirmed'].includes(booking.status) && booking.endDate >= today)
   .sort((a, b) => a.startDate.localeCompare(b.startDate)))
 
 function overlapsBooking(start: string, end: string) {
-  return scheduledBookings.value.find(booking => start <= booking.endDate && end >= booking.startDate)
+  const exclusiveEnd = addDays(end, 1)
+  return scheduledBookings.value.find(booking => booking.startDate < exclusiveEnd && booking.endDate > start)
 }
 
-function addBlock() {
+async function addBlock() {
   formError.value = ''
   if (!startDate.value || !endDate.value || !reason.value.trim()) {
     formError.value = 'Choose both dates and add a short reason.'
@@ -38,21 +41,31 @@ function addBlock() {
     formError.value = `These dates overlap with an existing unavailable period (${formatDate(duplicate.startDate)} – ${formatDate(duplicate.endDate)}).`
     return
   }
-  addUnavailableBlock({
-    id: `block-${Date.now()}`,
-    startDate: startDate.value,
-    endDate: endDate.value,
-    reason: reason.value.trim(),
-  })
+  try {
+    await addUnavailableBlock({
+      startDate: startDate.value,
+      endDate: endDate.value,
+      reason: reason.value.trim(),
+    })
+  }
+  catch (error) {
+    formError.value = error instanceof Error ? error.message : 'These dates could not be blocked.'
+    return
+  }
   startDate.value = ''
   endDate.value = ''
   reason.value = ''
-  toast.add({ title: 'Dates blocked in preview', description: 'They are only held in this browser tab.', icon: 'i-lucide-calendar-off', color: 'success' })
+  toast.add({ title: 'Dates blocked', icon: 'i-lucide-calendar-off', color: 'success' })
 }
 
-function removeBlock(id: string) {
-  removeUnavailableBlock(id)
-  toast.add({ title: 'Unavailable dates removed', description: 'The change is only held in this preview.', icon: 'i-lucide-circle-check', color: 'neutral' })
+async function removeBlock(id: string) {
+  try {
+    await removeUnavailableBlock(id)
+    toast.add({ title: 'Unavailable dates removed', icon: 'i-lucide-circle-check', color: 'neutral' })
+  }
+  catch (error) {
+    formError.value = error instanceof Error ? error.message : 'The unavailable dates could not be removed.'
+  }
 }
 </script>
 
@@ -122,7 +135,9 @@ function removeBlock(id: string) {
           <NuxtLink :to="`/sitter/bookings/${booking.id}`" class="block rounded-xl border border-default bg-primary/5 p-4 transition-colors hover:border-primary/40">
             <p class="text-sm font-semibold text-primary">{{ formatDate(booking.startDate) }} – {{ formatDate(booking.endDate) }}</p>
             <p class="mt-1 font-semibold">{{ booking.bookerName }}</p>
-            <p class="mt-1 text-sm text-toned">{{ booking.status === 'confirmed' ? 'Confirmed booking' : 'Accepted · handover times to agree' }}</p>
+            <p class="mt-1 text-sm text-toned">
+              {{ booking.status === 'confirmed' ? 'Confirmed booking' : booking.status === 'requested' ? 'Request pending' : 'Accepted · handover times to agree' }}
+            </p>
           </NuxtLink>
         </li>
       </ul>

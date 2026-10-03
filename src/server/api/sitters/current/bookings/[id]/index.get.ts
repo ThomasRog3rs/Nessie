@@ -1,9 +1,8 @@
-import { bookingIdSchema, cancelBookingSchema } from '../../../../../../shared/schemas/booking'
+import { bookingIdSchema } from '../../../../../../shared/schemas/booking.ts'
 import type { SitterBooking } from '../../../../../../shared/types/booking.ts'
 
 export default defineApiHandler(async (event): Promise<SitterBooking> => {
   const id = parseParam(event, 'id', bookingIdSchema)
-  const { reason } = await parseBody(event, cancelBookingSchema.default({}))
   const { sitterBookings, actors } = await useServices()
-  return sitterBookings.cancel(actors.sitterId(), id, reason)
+  return sitterBookings.get(actors.sitterId(), id)
 })

@@ -36,14 +36,21 @@ Conventions: dates `yyyy-mm-dd`, times `HH:mm`, instants ISO UTC, money in integ
 
 - Booker pages use `/book` and `/bookings/*`.
 - Sitter pages use the separate `/sitter/*` route group and the `sitter` layout: overview, requests, bookings, availability, and profile.
-- Sitter pages currently use `app/composables/useSitterWorkspace.ts` preview data because sitter-facing API handlers and file storage are not connected. Decisions and profile edits are held in Nuxt state for the current tab; selected receipt files are represented by their filename and sitting photos use temporary browser object URLs. Nothing is uploaded or retained after a reload.
-- This preview does not add authentication, backend routes, schema changes, invoices, or payment processing.
+- Sitter pages use the typed `/api/sitters/current/*` endpoints for persistent profiles, requests, bookings, availability, progress updates, expenses and photos. The current actor remains the development mock sitter; authentication is not implemented.
+- Property access instructions, emergency instructions and contact/veterinary details are omitted from sitter booking responses until the booking is confirmed or completed. Requested handover times remain separate from the agreed times.
+- Booking photos and receipts are stored outside SQLite in a private local directory. They are available only through an ownership-checked booking attachment route; their filesystem paths are never returned. The local filesystem adapter is intended for development or a single-node deployment with a persistent private volume.
+- Attachments are limited to one upload per request and 10 MiB per file. Receipts allow PDF/JPG/PNG; photos allow JPG/PNG/WebP. MIME types and file signatures are checked server-side.
+- Expenses and attachments are records/evidence only. There is no invoice generation, payment, reimbursement settlement, payable total, attendance verification or profile image storage.
 
 ## API
 
 Booker: `GET /api/sitters/current`, `GET /api/sitters/current/availability?from=&to=`, `GET|POST /api/bookings`, `GET /api/bookings/:id`, `POST /api/bookings/:id/cancel`.
 
-Sitter: `GET|POST /api/sitters/current/blocks`, `PATCH|DELETE /api/sitters/current/blocks/:id`, `GET /api/sitters/current/bookings`, `POST /api/sitters/current/bookings/:id/{accept,decline,times,cancel,complete}`.
+Sitter endpoints reused: `GET|POST /api/sitters/current/blocks`, `PATCH|DELETE /api/sitters/current/blocks/:id`, `GET /api/sitters/current/bookings`, and `POST /api/sitters/current/bookings/:id/{accept,decline,times,cancel,complete}`. Booking decisions continue to use the existing state machine; availability blocks remain inclusive and cannot overlap a date-holding booking.
+
+Sitter endpoints added: `GET|PATCH /api/sitters/current/profile`; `GET /api/sitters/current/bookings/:id`; `POST /api/sitters/current/bookings/:id/updates`; `POST /api/sitters/current/bookings/:id/expenses` (multipart fields `category`, `description`, integer-pence `amount`, optional `file` receipt); `POST /api/sitters/current/bookings/:id/expenses/:expenseId/receipt`; `POST /api/sitters/current/bookings/:id/attachments` (multipart `file` and optional `caption`, photos only); `GET|DELETE /api/sitters/current/bookings/:id/attachments/:attachmentId`.
+
+Attachment limits are 10 MiB each. Receipt types: `application/pdf`, `image/jpeg`, `image/png`. Photo types: `image/jpeg`, `image/png`, `image/webp`. The server checks both declared type and file signature. Booking attachments and progress updates require a confirmed or completed stay; progress updates are accepted only while confirmed. Sensitive care and emergency fields are present only for confirmed/completed bookings. Attachment routes are private and require the booking to belong to the current sitter actor.
 
 `GET /api/health` reports DB status and schema version.
 
@@ -59,6 +66,9 @@ Default file `.data/nessie.sqlite` (gitignored). Environment variables:
 | `NESSIE_BACKUP_DIR` | `.data/backups` | Backup directory |
 | `NESSIE_BACKUP_KEEP_DAILY` / `_WEEKLY` | see `server/db/backup.ts` | Retention |
 | `NESSIE_SEED_ON_EMPTY` | `true` in dev, `false` otherwise | Seed demo data into an empty DB |
+| `NESSIE_PRIVATE_UPLOAD_DIR` | `.data/private-uploads` | Private receipt/photo file storage directory |
+
+The SQLite backup commands do not include private upload files. Back up `NESSIE_PRIVATE_UPLOAD_DIR` separately using private, access-controlled storage and retention. The default local filesystem backend is not shared across application replicas and is not a managed/cloud file store; production deployments must provide a persistent private volume, protect it at rest, and include it in restore procedures.
 
 Seed data (relative to today): Thomas Rogers' blocked dates (annual leave, a personal day, a weekend away) and bookings in several states (confirmed, awaiting times, requested, completed, cancelled, declined). Every other date is available.
 

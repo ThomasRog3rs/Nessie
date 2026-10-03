@@ -95,8 +95,9 @@ export function isSeeded(db: Database): boolean {
 }
 
 export function clearData(db: Database): void {
-  for (const table of ['booking_history', 'booking_incidental_expenses', 'booking_services', 'booking_pets', 'bookings',
-    'availability_blocks', 'sitter_services', 'sitter_accepted_pets', 'booker_sitter_links', 'sitters', 'bookers']) {
+  for (const table of ['booking_attachments', 'sitter_expenses', 'booking_progress_updates', 'booking_history',
+    'booking_incidental_expenses', 'booking_services', 'booking_pets', 'bookings', 'availability_blocks',
+    'sitter_services', 'sitter_accepted_pets', 'booker_sitter_links', 'sitters', 'bookers']) {
     db.exec(`DELETE FROM ${table}`)
   }
 }
@@ -107,10 +108,11 @@ export function seedDatabase(db: Database, today: string): void {
   inTransaction(db, () => {
     db.prepare('INSERT INTO bookers (id, name, email, created_at) VALUES (?, ?, ?, ?)')
       .run(SEED_BOOKER_ID, 'Demo Booker', 'booker@nesse.test', now)
-    db.prepare(`INSERT INTO sitters (id, name, email, bio, rate_pence, rate_basis, currency, timezone, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'GBP', ?, ?)`).run(
+    db.prepare(`INSERT INTO sitters (id, name, email, bio, location, contact_phone, rate_pence, rate_basis, currency, timezone, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'GBP', ?, ?)`).run(
       SEED_SITTER_ID, 'Thomas Rogers', 'thomas@nesse.test',
       'Experienced house and pet sitter. Comfortable with dogs, cats and small animals, and happy to keep plants and post in order.',
+      'Bristol, UK', '07700 900 246',
       4500, 'per_night', 'Europe/London', now,
     )
     db.prepare('INSERT INTO booker_sitter_links (booker_id, sitter_id, created_at) VALUES (?, ?, ?)')

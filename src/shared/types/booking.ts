@@ -1,6 +1,9 @@
 import type { z } from 'zod'
 import type { bookingRequestSchema, cancelBookingSchema } from '../schemas/booking'
-import type { agreeTimesSchema, availabilityBlockInputSchema, declineBookingSchema } from '../schemas/sitter'
+import type {
+  agreeTimesSchema, attachmentKindSchema, availabilityBlockInputSchema, declineBookingSchema,
+  progressUpdateSchema, sitterExpenseSchema, sitterProfileInputSchema,
+} from '../schemas/sitter'
 
 /** Money is always an integer in minor units (pence). */
 export type Money = number
@@ -27,6 +30,7 @@ export interface OptionalService {
 export interface Sitter {
   id: string
   name: string
+  location: string
   bio: string
   rate: Money
   rateBasis: RateBasis
@@ -35,6 +39,44 @@ export interface Sitter {
   timezone: string
   acceptedPets: string[]
   optionalServices: OptionalService[]
+  phone?: string
+}
+
+export type SitterProfileInput = z.infer<typeof sitterProfileInputSchema>
+export type SitterProfile = Omit<Sitter, 'timezone' | 'currency'> & { phone: string }
+export type ProgressUpdateInput = z.infer<typeof progressUpdateSchema>
+export type SitterExpenseInput = z.infer<typeof sitterExpenseSchema>
+export type AttachmentKind = z.infer<typeof attachmentKindSchema>
+
+export interface BookingProgressUpdate {
+  id: string
+  date: string
+  message: string
+  creatorId: string
+  createdAt: string
+}
+
+export interface SitterExpense {
+  id: string
+  category: 'travel' | 'incidental'
+  description: string
+  amount: Money
+  creatorId: string
+  createdAt: string
+  receipt?: BookingAttachment
+}
+
+export interface BookingAttachment {
+  id: string
+  bookingId: string
+  expenseId?: string
+  kind: AttachmentKind
+  fileName: string
+  mimeType: string
+  size: number
+  caption?: string
+  creatorId: string
+  createdAt: string
 }
 
 export type DayStatus = 'available' | 'unavailable' | 'booked'
@@ -73,6 +115,11 @@ export type HistoryEventType =
   | 'changed'
   | 'cancelled'
   | 'completed'
+  | 'progress_update'
+  | 'expense_recorded'
+  | 'photo_added'
+  | 'receipt_added'
+  | 'attachment_removed'
 
 export interface BookingHistoryEntry {
   id: string
@@ -107,6 +154,19 @@ export interface Booking extends BookingRequest {
   agreedDepartureTime: string | null
   pricing: BookingPricing
   history: BookingHistoryEntry[]
+}
+
+export type SitterBooking = Omit<Booking,
+  'propertyInstructions' | 'emergencyContact' | 'vet' | 'emergencyInstructions'
+> & {
+  bookerName: string
+  propertyInstructions?: string
+  emergencyContact?: EmergencyContact
+  vet?: Booking['vet']
+  emergencyInstructions?: string
+  progressUpdates: BookingProgressUpdate[]
+  sitterExpenses: SitterExpense[]
+  attachments: BookingAttachment[]
 }
 
 export type ApiErrorCode =

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
-const { pendingRequests } = useSitterWorkspace()
+const { pendingRequests, error: workspaceError } = useSitterWorkspace()
 
 const items = [
   { label: 'Overview', to: '/sitter', icon: 'i-lucide-layout-dashboard', exact: true },
@@ -33,7 +33,7 @@ function isCurrent(item: typeof items[number]) {
           <span class="hidden border-l border-default pl-3 text-sm font-semibold text-toned sm:inline">Sitter workspace</span>
         </div>
         <div class="flex items-center gap-2">
-          <span class="hidden rounded-full bg-primary/5 px-3 py-1 text-xs font-semibold text-primary sm:inline-flex">Preview only</span>
+          <span class="hidden rounded-full bg-primary/5 px-3 py-1 text-xs font-semibold text-primary sm:inline-flex">Sitter workspace</span>
           <NuxtLink
             to="/book"
             class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-toned transition-colors hover:bg-primary/5 hover:text-primary"
@@ -68,12 +68,21 @@ function isCurrent(item: typeof items[number]) {
           </NuxtLink>
         </nav>
         <div class="mt-8 rounded-xl border border-default bg-elevated p-4">
-          <p class="text-sm font-semibold text-default">Preview workspace</p>
-          <p class="mt-1 text-sm text-muted">Your changes stay in this tab for now. Nothing is uploaded or saved to a server.</p>
+          <p class="text-sm font-semibold text-default">Private booking details</p>
+          <p class="mt-1 text-sm text-muted">Home access and emergency details are shown only after a booking is confirmed.</p>
         </div>
       </aside>
 
       <main id="main" tabindex="-1" class="min-w-0 px-4 pb-28 pt-6 outline-none sm:px-6 sm:pt-8 lg:px-10 lg:pb-12 lg:pt-10">
+        <UAlert
+          v-if="workspaceError"
+          class="mx-auto mb-6 max-w-5xl"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          title="Sitter workspace could not load"
+          :description="workspaceError.message"
+        />
         <slot />
       </main>
     </div>

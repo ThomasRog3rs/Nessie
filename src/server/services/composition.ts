@@ -40,7 +40,7 @@ export function createServices(
 
   return {
     actors: options.actors ?? new MockActorProvider(),
-    sitters: new SitterService(sitterRepository),
+    sitters: new SitterService(sitterRepository, transactions, ids),
     availability,
     availabilityBlocks: new AvailabilityBlockService(blockRepository, bookingRepository, clock, ids),
     bookings: new BookingService({
@@ -48,7 +48,7 @@ export function createServices(
       availability, lifecycle, transactions, clock, ids,
     }),
     sitterBookings: new SitterBookingService({
-      queries: bookingRepository, commands: bookingRepository, lifecycle, transactions, clock,
+      queries: bookingRepository, commands: bookingRepository, lifecycle, transactions, clock, ids,
     }),
   }
 }

@@ -5,21 +5,32 @@ useHead({ title: 'Sitter profile · Nesse' })
 const workspace = useSitterWorkspace()
 const toast = useToast()
 const profile = workspace.profile
-const petsOffered = ['Dogs', 'Cats', 'Small animals', 'Birds', 'Other']
+const petsOffered = ['Dog', 'Cat', 'Small animal', 'Bird', 'Fish', 'Other']
 const draft = reactive({
-  name: profile.value.name,
-  location: profile.value.location,
-  bio: profile.value.bio,
-  rate: (profile.value.ratePence / 100).toFixed(2),
-  rateBasis: profile.value.rateBasis,
-  acceptedPets: [...profile.value.acceptedPets],
-  phone: profile.value.phone,
-  services: profile.value.services.map(service => ({ ...service })),
+  name: '',
+  location: '',
+  bio: '',
+  rate: '',
+  rateBasis: 'per_night' as 'per_night' | 'per_day',
+  acceptedPets: [] as string[],
+  phone: '',
+  services: [] as { id?: string, name: string, pricePence: number }[],
 })
 const serviceName = ref('')
 const servicePrice = ref('')
 const formError = ref('')
 const saving = ref(false)
+
+watch(profile, (value) => {
+  draft.name = value.name
+  draft.location = value.location
+  draft.bio = value.bio
+  draft.rate = (value.ratePence / 100).toFixed(2)
+  draft.rateBasis = value.rateBasis
+  draft.acceptedPets = [...value.acceptedPets]
+  draft.phone = value.phone
+  draft.services = value.services.map(service => ({ ...service }))
+}, { immediate: true })
 
 function addService() {
   const name = serviceName.value.trim()
@@ -28,7 +39,7 @@ function addService() {
     formError.value = 'Add a service name and a valid price of £0 or more.'
     return
   }
-  draft.services.push({ id: `service-${Date.now()}`, name, pricePence: Math.round(price * 100) })
+  draft.services.push({ name, pricePence: Math.round(price * 100) })
   serviceName.value = ''
   servicePrice.value = ''
   formError.value = ''
@@ -51,9 +62,13 @@ function saveProfile() {
     acceptedPets: [...draft.acceptedPets],
     phone: draft.phone.trim(),
     services: draft.services.map(service => ({ ...service })),
+  }).then(() => {
+    toast.add({ title: 'Profile updated', icon: 'i-lucide-circle-check', color: 'success' })
+  }).catch((error: unknown) => {
+    formError.value = error instanceof Error ? error.message : 'The profile could not be saved.'
+  }).finally(() => {
+    saving.value = false
   })
-  saving.value = false
-  toast.add({ title: 'Profile updated in preview', description: 'These changes are only held in this browser tab.', icon: 'i-lucide-circle-check', color: 'success' })
 }
 </script>
 
@@ -80,7 +95,7 @@ function saveProfile() {
           <UAvatar :alt="draft.name" :text="draft.name.split(' ').map(part => part[0]).slice(0, 2).join('')" size="3xl" />
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-semibold">Profile basics</h2>
-            <p class="mt-1 text-sm text-muted">Profile photos are not available yet because Nesse does not store images.</p>
+            <p class="mt-1 text-sm text-muted">Profile photos are not part of the sitter profile.</p>
             <div class="mt-5 grid gap-4 sm:grid-cols-2">
               <UFormField label="Name" name="name" required>
                 <UInput v-model="draft.name" autocomplete="name" size="xl" class="w-full" />
@@ -135,7 +150,7 @@ function saveProfile() {
             </div>
           </div>
           <ul v-if="draft.services.length" class="mt-3 divide-y divide-default rounded-xl border border-default">
-            <li v-for="service in draft.services" :key="service.id" class="flex flex-wrap items-center justify-between gap-3 p-3">
+            <li v-for="(service, index) in draft.services" :key="service.id ?? index" class="flex flex-wrap items-center justify-between gap-3 p-3">
               <span class="min-w-0 font-semibold">{{ service.name }} <span class="font-normal text-muted">· {{ formatMoney(service.pricePence) }} per night</span></span>
               <UButton
                 type="button"

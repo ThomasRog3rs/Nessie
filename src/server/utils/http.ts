@@ -54,6 +54,10 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
   return result.data
 }
 
+export function parseValue<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
+  return parse(schema, value)
+}
+
 export async function parseBody<S extends z.ZodType>(event: H3Event, schema: S): Promise<z.infer<S>> {
   return parse(schema, await readBody(event))
 }

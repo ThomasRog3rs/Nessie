@@ -22,14 +22,19 @@ function statusLabel(status: string) {
   return status
 }
 
-function accept(id: string) {
-  updateStatus(id, 'accepted_times_pending')
-  toast.add({
-    title: 'Request accepted',
-    description: 'Agree exact arrival and departure times to confirm the booking.',
-    icon: 'i-lucide-circle-check',
-    color: 'success',
-  })
+async function accept(id: string) {
+  try {
+    await updateStatus(id, 'accepted_times_pending')
+    toast.add({
+      title: 'Request accepted',
+      description: 'Agree exact arrival and departure times to confirm the booking.',
+      icon: 'i-lucide-circle-check',
+      color: 'success',
+    })
+  }
+  catch (error) {
+    decisionError.value = error instanceof Error ? error.message : 'The request could not be accepted.'
+  }
 }
 
 function openDecline(id: string) {
@@ -44,9 +49,12 @@ function decline() {
     decisionError.value = 'Choose a request before declining it.'
     return
   }
-  updateStatus(decliningId.value, 'declined', declineReason.value.trim())
-  declineOpen.value = false
-  toast.add({ title: 'Request declined', description: 'The decision is recorded in this preview only.', icon: 'i-lucide-circle-x', color: 'neutral' })
+  updateStatus(decliningId.value, 'declined', declineReason.value.trim()).then(() => {
+    declineOpen.value = false
+    toast.add({ title: 'Request declined', icon: 'i-lucide-circle-x', color: 'neutral' })
+  }).catch((error: unknown) => {
+    decisionError.value = error instanceof Error ? error.message : 'The request could not be declined.'
+  })
 }
 </script>
 
@@ -158,7 +166,7 @@ function decline() {
       <p class="mx-auto mt-2 max-w-md text-muted">{{ filter === 'open' ? 'You’re up to date. New requests will appear here.' : 'Your requests will appear here when a booker sends one.' }}</p>
     </div>
 
-    <UModal v-model:open="declineOpen" title="Decline this request?" description="The booker will see that you declined. The decision will be recorded in this preview only.">
+    <UModal v-model:open="declineOpen" title="Decline this request?" description="The booker will see that you declined.">
       <template #body>
         <UFormField label="Note to the booker (optional)" name="decline-reason" hint="For example, you are unavailable for these dates.">
           <UTextarea v-model="declineReason" :rows="3" class="w-full" />

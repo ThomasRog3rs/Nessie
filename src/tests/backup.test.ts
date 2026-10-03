@@ -33,7 +33,7 @@ describe('backup and restore', () => {
     db.close()
     expect(verifyBackup(join(backupDirectory, manifest.file)).ok).toBe(true)
 
-    const result = restoreBackup({ backupPath: join(backupDirectory, manifest.file), databasePath, backupDirectory, supportedSchemaVersion: 1 })
+    const result = restoreBackup({ backupPath: join(backupDirectory, manifest.file), databasePath, backupDirectory, supportedSchemaVersion: 2 })
     expect(result.safetyBackup?.label).toBe('pre-restore')
 
     const restored = await open()
@@ -48,7 +48,7 @@ describe('backup and restore', () => {
     const path = join(backupDirectory, manifest.file)
     writeFileSync(path, Buffer.concat([readFileSync(path), Buffer.from('x')]))
     expect(verifyBackup(path).ok).toBe(false)
-    expect(() => restoreBackup({ backupPath: path, databasePath, backupDirectory, supportedSchemaVersion: 1 })).toThrow(/invalid backup/)
+    expect(() => restoreBackup({ backupPath: path, databasePath, backupDirectory, supportedSchemaVersion: 2 })).toThrow(/invalid backup/)
   })
 
   it('refuses a backup from a newer schema', async () => {
@@ -62,9 +62,11 @@ describe('backup and restore', () => {
   it('snapshots before applying migrations to existing data', async () => {
     const { db } = await open()
     db.close()
+    const migrations = await migrationSource.load()
+    const latestVersion = migrations.at(-1)?.version ?? 0
     const second = await openAndMigrate({
       databasePath, backupDirectory,
-      source: { load: async () => [...(await migrationSource.load()), { version: 2, name: 'extra', sql: 'CREATE TABLE extra (id INTEGER) STRICT' }] },
+      source: { load: async () => [...(await migrationSource.load()), { version: latestVersion + 1, name: 'extra', sql: 'CREATE TABLE extra (id INTEGER) STRICT' }] },
     })
     second.db.close()
     expect(second.preMigrationBackup?.label).toBe('pre-migration')

@@ -20,6 +20,14 @@ const statusLabel = computed(() => {
   return booking.value ? labels[booking.value.status] ?? booking.value.status : ''
 })
 const canAddSitUpdates = computed(() => booking.value?.status === 'confirmed')
+const canAddExpenses = computed(() => ['confirmed', 'completed'].includes(booking.value?.status ?? ''))
+const canAddAttachments = canAddExpenses
+const canCompleteBooking = computed(() => {
+  const value = booking.value
+  if (!value || value.status !== 'confirmed') return false
+  const todayAtProperty = new Intl.DateTimeFormat('en-CA', { timeZone: value.timezone }).format(new Date())
+  return todayAtProperty >= value.endDate
+})
 const arrivalTime = ref('')
 const departureTime = ref('')
 const timeError = ref('')
@@ -32,8 +40,11 @@ const expenseCategory = ref<'travel' | 'incidental'>('travel')
 const expenseDescription = ref('')
 const expenseAmount = ref('')
 const expenseFileName = ref('')
+const expenseFile = ref<File>()
+const expenseAttachmentError = ref('')
 const expenseError = ref('')
 const photoError = ref('')
+const decisionError = ref('')
 const photoCaption = ref('')
 const photoInput = ref<HTMLInputElement>()
 const documentInput = ref<HTMLInputElement>()
@@ -43,45 +54,65 @@ watch(booking, (value) => {
   departureTime.value = value?.departureTime ?? ''
 }, { immediate: true })
 
-function acceptRequest() {
+async function acceptRequest() {
   if (!booking.value) return
-  workspace.updateStatus(booking.value.id, 'accepted_times_pending')
-  toast.add({ title: 'Request accepted', description: 'Agree the exact handover times to confirm this booking.', icon: 'i-lucide-circle-check', color: 'success' })
+  try {
+    await workspace.updateStatus(booking.value.id, 'accepted_times_pending')
+    toast.add({ title: 'Request accepted', description: 'Agree the exact handover times to confirm the booking.', icon: 'i-lucide-circle-check', color: 'success' })
+  }
+  catch (error) {
+    decisionError.value = error instanceof Error ? error.message : 'The request could not be accepted.'
+  }
 }
 
-function confirmTimes() {
+async function confirmTimes() {
   if (!booking.value) return
   if (!arrivalTime.value || !departureTime.value) {
     timeError.value = 'Enter both handover times before confirming.'
     return
   }
-  workspace.confirmHandoverTimes(booking.value.id, arrivalTime.value, departureTime.value)
-  timeError.value = ''
-  toast.add({ title: 'Handover times confirmed', description: 'The booking now has agreed arrival and departure times in this preview.', icon: 'i-lucide-calendar-check', color: 'success' })
+  try {
+    await workspace.confirmHandoverTimes(booking.value.id, arrivalTime.value, departureTime.value)
+    timeError.value = ''
+    toast.add({ title: 'Handover times confirmed', description: 'The booking now records the agreed arrival and departure times.', icon: 'i-lucide-calendar-check', color: 'success' })
+  }
+  catch (error) {
+    timeError.value = error instanceof Error ? error.message : 'The handover times could not be confirmed.'
+  }
 }
 
-function cancelBooking() {
+async function cancelBooking() {
   if (!booking.value) return
   if (!['accepted_times_pending', 'confirmed'].includes(booking.value.status)) {
     cancellationError.value = 'Only an accepted or confirmed booking can be cancelled here.'
     return
   }
-  workspace.cancelBooking(booking.value.id, cancellationReason.value.trim())
-  cancelOpen.value = false
-  toast.add({ title: 'Booking cancelled', description: 'The cancellation is recorded in this preview only.', icon: 'i-lucide-ban', color: 'neutral' })
+  try {
+    await workspace.cancelBooking(booking.value.id, cancellationReason.value.trim())
+    cancelOpen.value = false
+    toast.add({ title: 'Booking cancelled', icon: 'i-lucide-ban', color: 'neutral' })
+  }
+  catch (error) {
+    cancellationError.value = error instanceof Error ? error.message : 'The booking could not be cancelled.'
+  }
 }
 
-function postUpdate() {
+async function postUpdate() {
   if (!booking.value) return
   const message = updateText.value.trim()
   if (!message) {
     updateError.value = 'Write a short update before posting.'
     return
   }
-  workspace.addUpdate(booking.value.id, { id: `update-${Date.now()}`, message, createdAt: new Date().toISOString() })
-  updateText.value = ''
-  updateError.value = ''
-  toast.add({ title: 'Update posted in preview', description: 'Your update is visible in this browser tab only.', icon: 'i-lucide-message-circle', color: 'success' })
+  try {
+    await workspace.addUpdate(booking.value.id, { message })
+    updateText.value = ''
+    updateError.value = ''
+    toast.add({ title: 'Update posted', icon: 'i-lucide-message-circle', color: 'success' })
+  }
+  catch (error) {
+    updateError.value = error instanceof Error ? error.message : 'The update could not be posted.'
+  }
 }
 
 function chooseExpenseDocument(event: Event) {
@@ -100,33 +131,37 @@ function chooseExpenseDocument(event: Event) {
     return
   }
   expenseFileName.value = file.name
+  expenseFile.value = file
   expenseError.value = ''
 }
 
-function addExpense() {
+async function addExpense() {
   if (!booking.value) return
   const amount = Number(expenseAmount.value)
   if (!expenseDescription.value.trim() || !Number.isFinite(amount) || amount <= 0) {
     expenseError.value = 'Add a description and an amount greater than £0.'
     return
   }
-  workspace.addExpense(booking.value.id, {
-    id: `expense-${Date.now()}`,
-    category: expenseCategory.value,
-    description: expenseDescription.value.trim(),
-    amountPence: Math.round(amount * 100),
-    fileName: expenseFileName.value,
-    createdAt: new Date().toISOString(),
-  })
-  expenseDescription.value = ''
-  expenseAmount.value = ''
-  expenseFileName.value = ''
-  expenseError.value = ''
-  if (documentInput.value) documentInput.value.value = ''
-  toast.add({ title: 'Expense recorded in preview', description: 'This amount is not part of an invoice or payment yet.', icon: 'i-lucide-receipt', color: 'success' })
+  try {
+    await workspace.addExpense(booking.value.id, {
+      category: expenseCategory.value,
+      description: expenseDescription.value.trim(),
+      amountPence: Math.round(amount * 100),
+    }, expenseFile.value)
+    expenseDescription.value = ''
+    expenseAmount.value = ''
+    expenseFileName.value = ''
+    expenseFile.value = undefined
+    expenseError.value = ''
+    if (documentInput.value) documentInput.value.value = ''
+    toast.add({ title: 'Expense recorded', description: 'No payment or reimbursement is created by this record.', icon: 'i-lucide-receipt', color: 'success' })
+  }
+  catch (error) {
+    expenseAttachmentError.value = error instanceof Error ? error.message : 'The expense could not be recorded.'
+  }
 }
 
-function addPhotos(event: Event) {
+async function addPhotos(event: Event) {
   if (!booking.value) return
   const input = event.currentTarget as HTMLInputElement
   const files = [...(input.files ?? [])]
@@ -137,23 +172,36 @@ function addPhotos(event: Event) {
     photoError.value = 'Some photos were not added. Choose JPG, PNG or WebP images, each up to 10 MB.'
   }
   const valid = files.filter(file => allowedTypes.includes(file.type) && file.size <= 10 * 1024 * 1024)
-  for (const file of valid) {
-    workspace.addPhoto(booking.value.id, {
-      id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      url: URL.createObjectURL(file),
-      fileName: file.name,
-      caption: photoCaption.value.trim() || `House-sitting photo with ${booking.value.pets.map(pet => pet.name).join(' and ')}.`,
-      createdAt: new Date().toISOString(),
-    })
+  try {
+    if (valid.length) await workspace.addPhotos(booking.value.id, valid, photoCaption.value.trim())
+    if (valid.length) photoCaption.value = ''
+    if (valid.length && !rejected.length) photoError.value = ''
   }
-  if (valid.length) photoCaption.value = ''
-  if (valid.length && !rejected.length) photoError.value = ''
+  catch (error) {
+    photoError.value = error instanceof Error ? error.message : 'Some photos could not be uploaded.'
+  }
   input.value = ''
 }
 
-function removePhoto(photoId: string) {
+async function removePhoto(photoId: string) {
   if (!booking.value) return
-  workspace.removePhoto(booking.value.id, photoId)
+  try {
+    await workspace.removePhoto(booking.value.id, photoId)
+  }
+  catch (error) {
+    photoError.value = error instanceof Error ? error.message : 'The photo could not be removed.'
+  }
+}
+
+async function completeBooking() {
+  if (!booking.value) return
+  try {
+    await workspace.completeBooking(booking.value.id)
+    toast.add({ title: 'Sit completed', icon: 'i-lucide-circle-check', color: 'success' })
+  }
+  catch (error) {
+    decisionError.value = error instanceof Error ? error.message : 'The booking could not be completed.'
+  }
 }
 
 function formatTimestamp(instant: string) {
@@ -191,14 +239,7 @@ function formatTimestamp(instant: string) {
         />
       </div>
 
-      <UAlert
-        class="mt-6"
-        color="info"
-        variant="subtle"
-        icon="i-lucide-flask-conical"
-        title="Preview only — no backend is connected"
-        description="Decisions, notes and selected files stay in this browser tab. Nothing is uploaded or saved after reloading."
-      />
+      <p v-if="decisionError" class="mt-4 rounded-lg border border-error/30 bg-error/5 p-3 text-sm font-semibold text-error" role="alert">{{ decisionError }}</p>
 
       <div v-if="booking.status === 'requested'" class="mt-5 rounded-xl border border-warning/30 bg-warning/5 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
         <div>
@@ -208,9 +249,11 @@ function formatTimestamp(instant: string) {
         <UButton class="mt-3 sm:mt-0" size="lg" icon="i-lucide-circle-check" @click="acceptRequest">Accept request</UButton>
       </div>
 
-      <div v-if="booking.status === 'accepted_times_pending'" class="mt-5 rounded-xl border border-warning/30 bg-warning/5 p-4 sm:p-5">
-        <h2 class="text-lg font-semibold">Agree exact handover times</h2>
-        <p class="mt-1 text-sm text-toned">These were the requested times. Confirm the agreed local times to make this a confirmed booking.</p>
+      <div v-if="booking.status === 'accepted_times_pending' || booking.status === 'confirmed'" class="mt-5 rounded-xl border border-warning/30 bg-warning/5 p-4 sm:p-5">
+        <h2 class="text-lg font-semibold">{{ booking.status === 'confirmed' ? 'Update agreed handover times' : 'Agree exact handover times' }}</h2>
+        <p class="mt-1 text-sm text-toned">
+          {{ booking.status === 'confirmed' ? 'Record an explicit change to the currently agreed local handover times.' : 'These were the requested times. Confirm the agreed local times to make this a confirmed booking.' }}
+        </p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <UFormField label="Arrival time" name="arrival-time" required>
             <UInput v-model="arrivalTime" type="time" size="xl" class="w-full" />
@@ -220,7 +263,9 @@ function formatTimestamp(instant: string) {
           </UFormField>
         </div>
         <p v-if="timeError" class="mt-3 text-sm font-semibold text-error" role="alert">{{ timeError }}</p>
-        <UButton class="mt-4" size="lg" icon="i-lucide-calendar-check" @click="confirmTimes">Confirm handover times</UButton>
+        <UButton class="mt-4" size="lg" icon="i-lucide-calendar-check" @click="confirmTimes">
+          {{ booking.status === 'confirmed' ? 'Save agreed time changes' : 'Confirm handover times' }}
+        </UButton>
       </div>
 
       <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(17rem,0.8fr)]">
@@ -230,11 +275,19 @@ function formatTimestamp(instant: string) {
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <dt class="text-sm text-muted">Arrival · {{ formatDate(booking.startDate) }}</dt>
-                <dd class="mt-1 font-semibold">{{ booking.arrivalTime }} <span v-if="booking.status === 'requested' || booking.status === 'accepted_times_pending'" class="font-normal text-muted">(requested)</span></dd>
+                <dd class="mt-1 font-semibold">
+                  {{ booking.arrivalTime }}
+                  <span v-if="booking.status === 'requested' || booking.status === 'accepted_times_pending'" class="font-normal text-muted">(requested)</span>
+                  <span v-else-if="booking.agreedArrivalTime !== booking.requestedArrivalTime" class="block text-sm font-normal text-muted">Requested {{ booking.requestedArrivalTime }}</span>
+                </dd>
               </div>
               <div>
                 <dt class="text-sm text-muted">Departure · {{ formatDate(booking.endDate) }}</dt>
-                <dd class="mt-1 font-semibold">{{ booking.departureTime }} <span v-if="booking.status === 'requested' || booking.status === 'accepted_times_pending'" class="font-normal text-muted">(requested)</span></dd>
+                <dd class="mt-1 font-semibold">
+                  {{ booking.departureTime }}
+                  <span v-if="booking.status === 'requested' || booking.status === 'accepted_times_pending'" class="font-normal text-muted">(requested)</span>
+                  <span v-else-if="booking.agreedDepartureTime !== booking.requestedDepartureTime" class="block text-sm font-normal text-muted">Requested {{ booking.requestedDepartureTime }}</span>
+                </dd>
               </div>
             </dl>
             <p class="mt-4 flex items-center gap-2 text-sm" :class="booking.status === 'confirmed' || booking.status === 'completed' ? 'text-success' : 'text-warning'">
@@ -307,14 +360,17 @@ function formatTimestamp(instant: string) {
                 <dt class="min-w-0">
                   {{ expense.description }}
                   <span class="block text-sm text-muted">{{ expense.category === 'travel' ? 'Travel' : 'Incidental' }}<span v-if="expense.fileName"> · {{ expense.fileName }}</span></span>
+                  <a v-if="expense.receiptUrl" :href="expense.receiptUrl" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-primary hover:underline">
+                    View receipt <UIcon name="i-lucide-external-link" class="size-4" aria-hidden="true" />
+                  </a>
                 </dt>
                 <dd class="shrink-0 font-semibold">{{ formatMoney(expense.amountPence) }}</dd>
               </div>
             </dl>
             <p v-if="!booking.requestedTravelPence && !booking.requestedIncidentals.length && !booking.expenses.length" class="mt-3 text-sm text-muted">No travel or incidental expenses have been recorded.</p>
-            <p class="mt-3 rounded-lg bg-elevated p-3 text-sm text-toned">First-class travel is not reimbursable by default. Agree standard/economy travel and incidental costs in advance. These expense records can inform future invoice work; no total is reconciled, and no invoice or payment is created here.</p>
+            <p class="mt-3 rounded-lg bg-elevated p-3 text-sm text-toned">First-class travel is not reimbursable by default. These records are evidence only: no payable total, reimbursement settlement, invoice or payment is created here.</p>
 
-            <form v-if="canAddSitUpdates" class="mt-5 space-y-4 border-t border-default pt-5" @submit.prevent="addExpense">
+            <form v-if="canAddExpenses" class="mt-5 space-y-4 border-t border-default pt-5" @submit.prevent="addExpense">
               <h3 class="font-semibold">Add an expense</h3>
               <UFormField label="Expense type" name="expense-category" required>
                 <USelect v-model="expenseCategory" :items="[{ label: 'Travel', value: 'travel' }, { label: 'Incidental', value: 'incidental' }]" size="xl" class="w-full" />
@@ -330,12 +386,12 @@ function formatTimestamp(instant: string) {
                 <UButton type="button" color="neutral" variant="outline" icon="i-lucide-paperclip" @click="documentInput?.click()">
                   {{ expenseFileName || 'Attach receipt (optional)' }}
                 </UButton>
-                <p class="mt-2 text-xs text-muted">PDF, JPG or PNG · up to 10 MB. The selected file stays on this device; only its name is shown in the preview.</p>
+                <p class="mt-2 text-xs text-muted">PDF, JPG or PNG · up to 10 MB. Receipt files are stored privately with this booking.</p>
               </div>
-              <p v-if="expenseError" role="alert" class="text-sm font-semibold text-error">{{ expenseError }}</p>
+              <p v-if="expenseError || expenseAttachmentError" role="alert" class="text-sm font-semibold text-error">{{ expenseError || expenseAttachmentError }}</p>
               <UButton type="submit" icon="i-lucide-plus">Record expense</UButton>
             </form>
-            <p v-else class="mt-5 border-t border-default pt-4 text-sm text-muted">New expenses can be added during a confirmed sit.</p>
+            <p v-else class="mt-5 border-t border-default pt-4 text-sm text-muted">Expenses can be added once a booking is confirmed.</p>
           </UCard>
 
           <UCard>
@@ -346,13 +402,13 @@ function formatTimestamp(instant: string) {
               </div>
               <UBadge color="neutral" variant="subtle" icon="i-lucide-image" label="Optional" />
             </div>
-            <div v-if="canAddSitUpdates" class="mt-4">
+            <div v-if="canAddAttachments" class="mt-4">
               <UFormField class="mb-3" label="Photo caption (optional)" name="photo-caption" hint="Add a short description to help the booker and anyone using a screen reader.">
                 <UInput v-model="photoCaption" maxlength="160" placeholder="e.g. Milo enjoying a morning walk" size="xl" class="w-full" />
               </UFormField>
               <input ref="photoInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple @change="addPhotos">
               <UButton type="button" color="neutral" variant="outline" icon="i-lucide-images" @click="photoInput?.click()">Choose photos</UButton>
-              <p class="mt-2 text-xs text-muted">JPG, PNG or WebP · up to 10 MB each. Selected photos remain in this tab only and are removed when reloaded.</p>
+              <p class="mt-2 text-xs text-muted">JPG, PNG or WebP · up to 10 MB each. Photos are stored privately with this booking.</p>
               <p v-if="photoError" role="alert" class="mt-2 text-sm font-semibold text-error">{{ photoError }}</p>
             </div>
             <p v-else class="mt-4 rounded-lg bg-elevated p-3 text-sm text-muted">Photos become available after handover times are agreed and the booking is confirmed.</p>
@@ -403,7 +459,7 @@ function formatTimestamp(instant: string) {
       />
 
       <div v-if="booking.status === 'confirmed' || booking.status === 'accepted_times_pending'" class="mt-6 border-t border-default pt-6">
-        <UModal v-model:open="cancelOpen" title="Cancel this booking?" description="The booker will be notified and the cancellation recorded. This preview does not send notifications.">
+        <UModal v-model:open="cancelOpen" title="Cancel this booking?" description="The explicit cancellation and optional reason will be saved in the booking history.">
           <UButton color="error" variant="outline" size="lg" icon="i-lucide-ban">Cancel booking</UButton>
           <template #body>
             <p v-if="booking.alternativeCareTermAcknowledged" class="text-sm text-toned">
@@ -421,6 +477,15 @@ function formatTimestamp(instant: string) {
             </div>
           </template>
         </UModal>
+        <UButton
+          v-if="canCompleteBooking"
+          class="ml-3"
+          color="success"
+          variant="outline"
+          size="lg"
+          icon="i-lucide-check"
+          @click="completeBooking"
+        >Mark sit complete</UButton>
       </div>
 
       <section aria-labelledby="history-heading" class="mt-10 border-t border-default pt-6">

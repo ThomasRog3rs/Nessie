@@ -1,5 +1,6 @@
 import type {
-  ActorRole, Booking, BookingHistoryEntry, BookingStatus, HistoryEventType, RateBasis,
+  ActorRole, Booking, BookingAttachment, BookingHistoryEntry, BookingProgressUpdate, BookingStatus,
+  HistoryEventType, RateBasis, SitterExpense,
 } from '../../../shared/types/booking.ts'
 import { calculatePricing } from '../../../shared/utils/pricing.ts'
 import { stayNights } from '../../../shared/utils/dateRange.ts'
@@ -43,6 +44,19 @@ interface HistoryRow {
   message: string
 }
 
+interface AttachmentRow {
+  id: string
+  booking_id: string
+  expense_id: string | null
+  kind: BookingAttachment['kind']
+  file_name: string
+  mime_type: string
+  size_bytes: number
+  caption: string
+  creator_id: string
+  created_at: string
+}
+
 const ACTIVE_PLACEHOLDERS = ACTIVE_STATUSES.map(() => '?').join(', ')
 
 export class SqliteBookingRepository implements BookingQueries, BookingCommands {
@@ -60,6 +74,12 @@ export class SqliteBookingRepository implements BookingQueries, BookingCommands 
     return this.findOne('id = ? AND sitter_id = ?', [bookingId, sitterId])
   }
 
+  findBookerNameForSitter(bookingId: string, sitterId: string): string | undefined {
+    const row = this.db.prepare(`SELECT b.name FROM bookings k JOIN bookers b ON b.id = k.booker_id
+      WHERE k.id = ? AND k.sitter_id = ?`).get(bookingId, sitterId) as { name: string } | undefined
+    return row?.name
+  }
+
   listForBooker(bookerId: string): Booking[] {
     return this.findMany('booker_id = ?', [bookerId])
   }
@@ -73,6 +93,42 @@ export class SqliteBookingRepository implements BookingQueries, BookingCommands 
       WHERE sitter_id = ? AND status IN (${ACTIVE_PLACEHOLDERS}) AND start_date < ? AND end_date > ? ORDER BY start_date`)
       .all(sitterId, ...ACTIVE_STATUSES, to, from) as unknown as Array<{ start_date: string, end_date: string }>
     return rows.map(row => ({ startDate: row.start_date, endDate: row.end_date }))
+  }
+
+  listProgressUpdates(bookingId: string): BookingProgressUpdate[] {
+    const rows = this.db.prepare(`SELECT id, update_date AS date, message, creator_id AS creatorId, created_at AS createdAt
+      FROM booking_progress_updates WHERE booking_id = ? ORDER BY created_at, id`).all(bookingId) as unknown as BookingProgressUpdate[]
+    return rows
+  }
+
+  listSitterExpenses(bookingId: string): SitterExpense[] {
+    const rows = this.db.prepare(`SELECT id, category, description, amount_pence AS amount, creator_id AS creatorId, created_at AS createdAt
+      FROM sitter_expenses WHERE booking_id = ? ORDER BY created_at, id`).all(bookingId) as unknown as Omit<SitterExpense, 'receipt'>[]
+    const receipts = this.listAttachments(bookingId).filter(attachment => attachment.kind === 'receipt')
+    return rows.map((expense) => {
+      const receipt = receipts.find(attachment => attachment.expenseId === expense.id)
+      return { ...expense, ...(receipt ? { receipt } : {}) }
+    })
+  }
+
+  listAttachments(bookingId: string): BookingAttachment[] {
+    const rows = this.db.prepare(`SELECT id, booking_id, expense_id, kind, file_name, mime_type, size_bytes,
+      caption, creator_id, created_at FROM booking_attachments WHERE booking_id = ? ORDER BY created_at, id`)
+      .all(bookingId) as unknown as AttachmentRow[]
+    return rows.map(row => this.mapAttachment(row))
+  }
+
+  findAttachment(bookingId: string, attachmentId: string): BookingAttachment | undefined {
+    const row = this.db.prepare(`SELECT id, booking_id, expense_id, kind, file_name, mime_type, size_bytes,
+      caption, creator_id, created_at FROM booking_attachments WHERE booking_id = ? AND id = ?`)
+      .get(bookingId, attachmentId) as AttachmentRow | undefined
+    return row && this.mapAttachment(row)
+  }
+
+  findAttachmentStorageKey(bookingId: string, attachmentId: string): string | undefined {
+    const row = this.db.prepare('SELECT storage_key FROM booking_attachments WHERE booking_id = ? AND id = ?')
+      .get(bookingId, attachmentId) as { storage_key: string } | undefined
+    return row?.storage_key
   }
 
   insert({ booking, bookerId, sitterId }: NewBooking): void {
@@ -116,6 +172,31 @@ export class SqliteBookingRepository implements BookingQueries, BookingCommands 
   appendHistory(bookingId: string, entry: BookingHistoryEntry): void {
     this.db.prepare('INSERT INTO booking_history (id, booking_id, at, type, actor, message) VALUES (?, ?, ?, ?, ?, ?)')
       .run(entry.id, bookingId, entry.at, entry.type, entry.actor, entry.message)
+  }
+
+  insertProgressUpdate(bookingId: string, update: BookingProgressUpdate): void {
+    this.db.prepare(`INSERT INTO booking_progress_updates (id, booking_id, update_date, message, creator_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)`).run(update.id, bookingId, update.date, update.message, update.creatorId, update.createdAt)
+  }
+
+  insertSitterExpense(bookingId: string, expense: SitterExpense): void {
+    this.db.prepare(`INSERT INTO sitter_expenses (id, booking_id, category, description, amount_pence, creator_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+      expense.id, bookingId, expense.category, expense.description, expense.amount, expense.creatorId, expense.createdAt,
+    )
+  }
+
+  insertAttachment(attachment: BookingAttachment & { storageKey: string }): void {
+    this.db.prepare(`INSERT INTO booking_attachments
+      (id, booking_id, expense_id, kind, storage_key, file_name, mime_type, size_bytes, caption, creator_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      attachment.id, attachment.bookingId, attachment.expenseId ?? null, attachment.kind, attachment.storageKey,
+      attachment.fileName, attachment.mimeType, attachment.size, attachment.caption ?? '', attachment.creatorId, attachment.createdAt,
+    )
+  }
+
+  deleteAttachment(bookingId: string, attachmentId: string): void {
+    this.db.prepare('DELETE FROM booking_attachments WHERE booking_id = ? AND id = ?').run(bookingId, attachmentId)
   }
 
   private findOne(where: string, params: string[]): Booking | undefined {
@@ -185,6 +266,21 @@ export class SqliteBookingRepository implements BookingQueries, BookingCommands 
         incidentalExpenses,
       }),
       history,
+    }
+  }
+
+  private mapAttachment(row: AttachmentRow): BookingAttachment {
+    return {
+      id: row.id,
+      bookingId: row.booking_id,
+      ...(row.expense_id ? { expenseId: row.expense_id } : {}),
+      kind: row.kind,
+      fileName: row.file_name,
+      mimeType: row.mime_type,
+      size: row.size_bytes,
+      ...(row.caption ? { caption: row.caption } : {}),
+      creatorId: row.creator_id,
+      createdAt: row.created_at,
     }
   }
 }
