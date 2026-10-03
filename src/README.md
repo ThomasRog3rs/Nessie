@@ -32,6 +32,13 @@ routes (server/api)  ->  services (server/services)  ->  repository contracts (s
 
 Conventions: dates `yyyy-mm-dd`, times `HH:mm`, instants ISO UTC, money in integer pence. A booking occupies nights `[start, end)`; availability blocks are inclusive ranges. Dates with no block or active booking are available; `booked` wins over `unavailable`.
 
+### Frontend workspaces
+
+- Booker pages use `/book` and `/bookings/*`.
+- Sitter pages use the separate `/sitter/*` route group and the `sitter` layout: overview, requests, bookings, availability, and profile.
+- Sitter pages currently use `app/composables/useSitterWorkspace.ts` preview data because sitter-facing API handlers and file storage are not connected. Decisions and profile edits are held in Nuxt state for the current tab; selected receipt files are represented by their filename and sitting photos use temporary browser object URLs. Nothing is uploaded or retained after a reload.
+- This preview does not add authentication, backend routes, schema changes, invoices, or payment processing.
+
 ## API
 
 Booker: `GET /api/sitters/current`, `GET /api/sitters/current/availability?from=&to=`, `GET|POST /api/bookings`, `GET /api/bookings/:id`, `POST /api/bookings/:id/cancel`.
